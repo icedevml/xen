@@ -1643,7 +1643,7 @@ void __init setup_virt_paging(void)
     smp_call_function(setup_virt_paging_one, (void *)val, 1);
 }
 
-bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
+int p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
 {
     int rc;
     bool_t violation;
@@ -1654,11 +1654,29 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
 
     /* Mem_access is not in use. */
     if ( !p2m->mem_access_enabled )
-        return true;
+        return -ENOSYS;
 
     rc = p2m_get_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), &xma);
-    if ( rc )
-        return true;
+    switch ( rc )
+    {
+    case -ESRCH:
+        /*
+         * If we can't find any mem_access setting for this page then the page
+         * might have just been removed and the event was triggered by no longer
+         * valid settings. The vCPU should just retry to get to the proper error
+         * path.
+         */
+        return 0;
+    case -ERANGE:
+        /*
+         * The mem_access settings are corrupted. Crashing the domain is the
+         * appropriate step in this case.
+         */
+        domain_crash(v->domain);
+        return 1;
+    };
+
+    ASSERT(!rc);
 
     /* Now check for mem_access violation. */
     switch ( xma )
@@ -1692,15 +1710,20 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
         break;
     }
 
+    /*
+     * If there is no violation found based on the current setting this event
+     * has been triggereded by a setting that is no longer current. The vCPU
+     * should just retry the access in this case.
+     */
     if ( !violation )
-        return true;
+        return 0;
 
     /* First, handle rx2rw and n2rwx conversion automatically. */
     if ( npfec.write_access && xma == XENMEM_access_rx2rw )
     {
         rc = p2m_set_mem_access(v->domain, _gfn(paddr_to_pfn(gpa)), 1,
                                 0, ~0, XENMEM_access_rw, 0);
-        return false;
+        return 1;
     }
     else if ( xma == XENMEM_access_n2rwx )
     {
@@ -1731,8 +1754,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
             }
         }
 
-        /* No need to reinject */
-        return false;
+        return 1;
     }
 
     req = xzalloc(vm_event_request_t);
@@ -1770,7 +1792,7 @@ bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec)
     if ( xma != XENMEM_access_n2rwx )
         vm_event_vcpu_pause(v);
 
-    return false;
+    return 1;
 }
 
 /*

@@ -285,10 +285,14 @@ static inline bool_t p2m_vm_event_sanity_check(struct domain *d)
 }
 
 /*
- * Send mem event based on the access. Boolean return value indicates if trap
- * needs to be injected into guest.
+ * Send vm_event based on the access. Return value -ENOSYS indicates that
+ * mem_access is not active on the domain; 0 indicates the instruction should
+ * be reexecuted; 1 indicates mem_access handled the fault and appropriate
+ * steps have been taken (ie. vCPU pause or domain crash).
+ * Note: since mem_access is the only system using stage 2 permissions at this
+ * time it is safe to ignore the return value.
  */
-bool_t p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec);
+int p2m_mem_access_check(paddr_t gpa, vaddr_t gla, const struct npfec npfec);
 
 #endif /* _XEN_P2M_H */
 

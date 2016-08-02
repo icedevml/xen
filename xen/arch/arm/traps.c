@@ -2415,11 +2415,13 @@ static void do_trap_instr_abort_guest(struct cpu_user_regs *regs,
                 goto bad_insn_abort;
         }
 
-        rc = p2m_mem_access_check(gpa, gva, npfec);
-
-        /* Trap was triggered by mem_access, work here is done */
-        if ( !rc )
-            return;
+        p2m_mem_access_check(gpa, gva, npfec);
+        /*
+         * We only ever get here because of mem_access at this point
+         * so work here is done and the vCPU is either paused or it
+         * is going to reexecute the violating instruction.
+         */
+        return;
     }
     break;
     }
@@ -2462,11 +2464,13 @@ static void do_trap_data_abort_guest(struct cpu_user_regs *regs,
             .kind = dabt.s1ptw ? npfec_kind_in_gpt : npfec_kind_with_gla
         };
 
-        rc = p2m_mem_access_check(info.gpa, info.gva, npfec);
-
-        /* Trap was triggered by mem_access, work here is done */
-        if ( !rc )
-            return;
+        p2m_mem_access_check(info.gpa, info.gva, npfec);
+        /*
+         * We only ever get here because of mem_access at this point
+         * so work here is done and the vCPU is either paused or it
+         * is going to reexecute the violating instruction.
+         */
+        return;
     }
     break;
     }
