@@ -7,6 +7,7 @@ obj-y += altp2m.o
 obj-y += guest_walk_2.o
 obj-y += guest_walk_3.o
 obj-y += guest_walk_4.o
+obj-y += mem_access.o
 obj-y += mem_paging.o
 obj-y += mem_sharing.o
 

@@ -25,7 +25,7 @@
 #include <xen/hypercall.h>
 #include <xen/vm_event.h>
 #include <public/memory.h>
-#include <asm/p2m.h>
+#include <xen/mem_access.h>
 #include <xsm/xsm.h>
 
 int mem_access_memop(unsigned long cmd,

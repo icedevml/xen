@@ -23,6 +23,10 @@
 #define _XEN_ASM_MEM_ACCESS_H
 
 #include <public/memory.h>
+#include <xen/p2m-common.h>
+#ifdef CONFIG_X86
+#include <asm/mem_access.h>
+#endif
 #include <asm/p2m.h>
 
 #ifdef CONFIG_HAS_MEM_ACCESS
