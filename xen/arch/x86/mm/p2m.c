@@ -2755,6 +2755,8 @@ int p2m_altp2m_propagate_change(struct domain *d, gfn_t gfn,
             continue;
 
         p2m = d->arch.altp2m_p2m[i];
+        p2m->tlb_flush(p2m);
+
         m = get_gfn_type_access(p2m, gfn_x(gfn), &t, &a, 0, NULL);
 
         /* Check for a dropped page that may impact this altp2m */
