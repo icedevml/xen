@@ -195,7 +195,10 @@ int arch_monitor_domctl_event(struct domain *d,
             struct vcpu *v;
             /* Latches new CR3 or CR4 mask through CR0 code. */
             for_each_vcpu ( d, v )
+            {
                 hvm_update_guest_cr(v, 0);
+                hvm_asid_flush_vcpu(v);
+            }
         }
 
         domain_unpause(d);
