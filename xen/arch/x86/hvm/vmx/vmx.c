@@ -55,6 +55,7 @@
 #include <asm/hvm/nestedhvm.h>
 #include <asm/altp2m.h>
 #include <asm/event.h>
+#include <asm/ipt.h>
 #include <asm/mce.h>
 #include <asm/monitor.h>
 #include <public/arch-x86/cpuid.h>
@@ -466,11 +467,16 @@ static int vmx_vcpu_initialise(struct vcpu *v)
     if ( v->vcpu_id == 0 )
         v->arch.user_regs.rax = 1;
 
+    rc = ipt_initialize(v);
+    if ( rc )
+        dprintk(XENLOG_ERR, "%pv: Failed to init Intel Processor Trace.\n", v);
+
     return 0;
 }
 
 static void vmx_vcpu_destroy(struct vcpu *v)
 {
+    ipt_destroy(v);
     /*
      * There are cases that domain still remains in log-dirty mode when it is
      * about to be destroyed (ex, user types 'xl destroy <dom>'), in which case
@@ -2892,6 +2898,15 @@ static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content)
         if ( vpmu_do_rdmsr(msr, msr_content) )
             goto gp_fault;
         break;
+    case MSR_IA32_RTIT_CTL:
+    case MSR_IA32_RTIT_STATUS:
+    case MSR_IA32_RTIT_OUTPUT_BASE:
+    case MSR_IA32_RTIT_OUTPUT_MASK:
+    case MSR_IA32_RTIT_CR3_MATCH:
+    case MSR_IA32_RTIT_ADDR_A(0) ... MSR_IA32_RTIT_ADDR_B(3):
+        if ( ipt_do_rdmsr(msr, msr_content) )
+            goto gp_fault;
+        break;
 
     default:
         if ( passive_domain_do_rdmsr(msr, msr_content) )
@@ -3142,6 +3157,15 @@ static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content)
          if ( vpmu_do_wrmsr(msr, msr_content, 0) )
             goto gp_fault;
         break;
+    case MSR_IA32_RTIT_CTL:
+    case MSR_IA32_RTIT_STATUS:
+    case MSR_IA32_RTIT_OUTPUT_BASE:
+    case MSR_IA32_RTIT_OUTPUT_MASK:
+    case MSR_IA32_RTIT_CR3_MATCH:
+    case MSR_IA32_RTIT_ADDR_A(0) ... MSR_IA32_RTIT_ADDR_B(3):
+        if ( ipt_do_wrmsr(msr, msr_content) )
+            goto gp_fault;
+        break;
 
     default:
         if ( passive_domain_do_wrmsr(msr, msr_content) )
@@ -3229,6 +3253,7 @@ static void ept_handle_violation(ept_qual_t q, paddr_t gpa)
         .write_access = q.write,
         .insn_fetch = q.fetch,
         .present = q.eff_read || q.eff_write || q.eff_exec,
+        .async = q.async,
     };
 
     if ( tb_init_done )
@@ -3507,6 +3532,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(GUEST_RIP,    &regs->rip);
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
+
+    ipt_guest_exit(v);
 
     hvm_invalidate_regs_fields(regs);
 
@@ -4001,6 +4028,10 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         break;
 
     case EXIT_REASON_APIC_ACCESS:
+        __vmread(EXIT_QUALIFICATION, &exit_qualification);
+        if ( exit_qualification & 0x10000 )
+            goto exit_and_crash;
+
         if ( !vmx_handle_eoi_write() && !handle_mmio() )
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
         break;
@@ -4281,6 +4312,8 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
+    ipt_guest_enter(curr);
+
     if ( unlikely(curr->arch.hvm_vmx.lbr_fixup_enabled) )
         lbr_fixup();
 
