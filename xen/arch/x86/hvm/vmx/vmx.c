@@ -3729,6 +3729,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
+    wrmsrl(MSR_IA32_RTIT_CTL, 0);
+
     hvm_invalidate_regs_fields(regs);
 
     if ( paging_mode_hap(v->domain) )
@@ -4443,6 +4445,8 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     u32 new_asid, old_asid;
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
+    p2m_type_t p2mt;
+    mfn_t mfn;
 
     /* Shadow EPTP can't be updated here because irqs are disabled */
      if ( nestedhvm_vcpu_in_guestmode(curr) && vcpu_nestedhvm(curr).stale_np2m )
@@ -4525,6 +4529,14 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
+    mfn = get_gfn_query(current->domain, 0xA70A3D70, &p2mt);
+    printk("mfn %llx\n", (unsigned long long)mfn);
+
+    wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, mfn);
+    wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x1FFF);
+    wrmsrl(MSR_IA32_RTIT_CR3_MATCH, 0);
+    wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN);
+
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();
 
