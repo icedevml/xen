@@ -4447,6 +4447,7 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     bool_t need_flush;
     p2m_type_t p2mt;
     mfn_t mfn;
+    uint64_t ipt_status;
 
     /* Shadow EPTP can't be updated here because irqs are disabled */
      if ( nestedhvm_vcpu_in_guestmode(curr) && vcpu_nestedhvm(curr).stale_np2m )
@@ -4531,6 +4532,9 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
  out:
     mfn = get_gfn_query(current->domain, 0xA70A3D70, &p2mt);
     printk("mfn %llx\n", (unsigned long long)mfn);
+
+    rdmsrl(MSR_IA32_RTIT_STATUS, ipt_status);
+    printk("rtit status %llx\n", (unsigned long long)ipt_status);
 
     wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, mfn);
     wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x1FFF);
