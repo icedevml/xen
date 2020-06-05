@@ -4538,8 +4538,7 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
 
     wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, mfn);
     wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x1FFF);
-    wrmsrl(MSR_IA32_RTIT_CR3_MATCH, 0);
-    wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN);
+    wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR);
 
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();
