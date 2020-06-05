@@ -231,6 +231,7 @@ static int vmx_init_vmcs_config(void)
     u32 _vmx_vmentry_control;
     u64 _vmx_vmfunc = 0;
     bool_t mismatch = 0;
+    int ipt_supported;
 
     rdmsr(MSR_IA32_VMX_BASIC, vmx_basic_msr_low, vmx_basic_msr_high);
 
@@ -527,6 +528,29 @@ static int vmx_init_vmcs_config(void)
         printk("VMX: CPU%d has unexpected VMCS access type %u\n",
                smp_processor_id(), opt);
         return -EINVAL;
+    }
+
+    /* Check whether IPT is supported in VMX operation */
+    ipt_supported = 1;
+
+    if ( !cpu_has_ipt )
+    {
+        ipt_supported = 0;
+        printk("VMX: CPU%d doesn't support Intel Processor Trace x86 feature.\n",
+               smp_processor_id());
+    }
+
+    if ( !( _vmx_misc_cap & VMX_MISC_PT_SUPPORTED ) )
+    {
+        ipt_supported = 0;
+        printk("VMX: CPU%d doesn't support Intel Processor Trace in VMX operation, VMX_MISC caps: %llx\n",
+               smp_processor_id(), (unsigned long long)_vmx_misc_cap);
+    }
+
+    if (ipt_supported)
+    {
+        printk("VMX: Intel Processor Trace is SUPPORTED by %d\n",
+               smp_processor_id());
     }
 
     return 0;

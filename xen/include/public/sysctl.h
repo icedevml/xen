@@ -78,6 +78,20 @@ struct xen_sysctl_tbuf_op {
     uint32_t size;  /* Also an IN variable! */
 };
 
+/* Alloc trace buffers for IPT */
+/* XEN_SYSCTL_ptbuf_op */
+struct xen_sysctl_ptbuf_op {
+    /* IN variables */
+#define XEN_SYSCTL_PTBUFOP_alloc       0
+#define XEN_SYSCTL_PTBUFOP_dealloc     1
+    domid_t domain;
+    uint32_t cmd;
+    uint32_t order;
+
+    /* OUT variables */
+    uint64_aligned_t mfn;
+};
+
 /*
  * Get physical information about the host machine
  */
@@ -1130,6 +1144,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_livepatch_op                  27
 #define XEN_SYSCTL_set_parameter                 28
 #define XEN_SYSCTL_get_cpu_policy                29
+#define XEN_SYSCTL_ptbuf_op                      30
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -1162,6 +1177,7 @@ struct xen_sysctl {
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_sysctl_cpu_policy        cpu_policy;
 #endif
+        struct xen_sysctl_ptbuf_op          ptbuf_op;
         uint8_t                             pad[128];
     } u;
 };
