@@ -79,6 +79,74 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
     return rc;
 }
 
+int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out)
+{
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
+    int rc = -1;
+    unsigned long mfn;
+    struct pt_state *ptst;
+    void *buf;
+    int i;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->version = HVMOP_IPT_INTERFACE_VERSION;
+    arg->cmd = HVMOP_ipt_enable;
+    arg->domain = domid;
+    arg->order = order;
+
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+
+    if ( rc == 0 )
+    {
+        printf("MFN: %llx\n", (unsigned long long)arg->mfn);
+        mfn = arg->mfn;
+        ptst = (struct pt_state *)xc_map_foreign_range(xch, DOMID_XEN, PAGE_SIZE, PROT_READ, mfn);
+
+        out->num_vcpus = ptst->num_vcpus;
+        out->pt_buf = (void **)malloc(ptst->num_vcpus * sizeof(void *));
+        out->state = (struct pt_vcpu_state **)malloc(ptst->num_vcpus * sizeof(struct pt_vcpu_state *));
+
+        for (i = 0; i < ptst->num_vcpus; i++)
+        {
+            printf("IPT buffer vCPU: %d MFN: %llx\n", i, (unsigned long long)ptst->vcpu[i].buf_mfn);
+            out->pt_buf[i] = NULL;
+            out->state[i] = NULL;
+
+            if (ptst->vcpu[i].buf_mfn) {
+                buf = xc_map_foreign_range(xch, DOMID_XEN, ptst->vcpu[i].size, PROT_READ, ptst->vcpu[i].buf_mfn);
+                printf("Mapped buffer: %llx\n", (unsigned long long)buf);
+                out->pt_buf[i] = buf;
+                out->state[i] = &ptst->vcpu[i];
+            }
+        }
+    }
+
+    return rc;
+}
+
+int xc_ptbuf_disable(xc_interface *xch, uint32_t domid)
+{
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
+    int rc = -1;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->version = HVMOP_IPT_INTERFACE_VERSION;
+    arg->cmd = HVMOP_ipt_disable;
+    arg->domain = domid;
+
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+
+    return rc;
+}
+
 int xc_tbuf_enable(xc_interface *xch, unsigned long pages, unsigned long *mfn,
                    unsigned long *size)
 {

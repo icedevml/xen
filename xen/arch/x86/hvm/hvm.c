@@ -4927,6 +4927,152 @@ static int compat_altp2m_op(
     return rc;
 }
 
+static int do_ipt_op(
+    XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    struct xen_hvm_ipt_op a;
+    struct domain *d = NULL;
+    int rc = -EFAULT;
+    void* ipt_buf;
+    int i;
+    struct vcpu *v;
+    struct pt_state* ptst = NULL;
+    uint32_t buffer_size;
+    int required_pages;
+
+    if ( !hvm_ipt_supported() )
+        return -EOPNOTSUPP;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    if ( a.version != HVMOP_IPT_INTERFACE_VERSION )
+        return -EINVAL;
+
+    switch ( a.cmd )
+    {
+    case HVMOP_ipt_enable:
+    case HVMOP_ipt_disable:
+        break;
+
+    default:
+        return -EOPNOTSUPP;
+    }
+
+    d = rcu_lock_domain_by_any_id(a.domain);
+
+    if ( d == NULL )
+        return -ESRCH;
+
+    if ( !is_hvm_domain(d) )
+    {
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+
+    if (a.cmd == HVMOP_ipt_enable)
+    {
+        if (d->arch.hvm.vmx.pub_ipt_state) {
+            // already enabled
+            rc = -EINVAL;
+            goto out;
+	}
+
+        required_pages = PFN_UP(sizeof(struct pt_state) + (sizeof(struct pt_vcpu_state) * d->max_vcpus));
+        ptst = (struct pt_state *)page_to_virt(alloc_domheap_pages(d, required_pages, 0));
+        memset(ptst, 0, required_pages * PAGE_SIZE);
+
+	for (i = 0; i < required_pages; i++)
+            share_xen_page_with_privileged_guests(virt_to_page(ptst) + i, SHARE_ro);
+
+        a.mfn = virt_to_mfn(ptst);
+
+	ptst->num_pages = required_pages;
+        ptst->num_vcpus = d->max_vcpus;
+
+        buffer_size = (1 << a.order) << PAGE_SHIFT;
+
+        for_each_vcpu ( d, v )
+        {
+            ipt_buf = page_to_virt(alloc_domheap_pages(d, a.order, 0));
+
+            if (!ipt_buf) {
+                rc = -EFAULT;
+                goto out;
+            }
+
+	    if (v->vcpu_id >= ptst->num_vcpus) {
+                rc = -EFAULT;
+		goto out;
+	    }
+
+            buffer_size = (1 << a.order) << PAGE_SHIFT;
+            memset(ipt_buf, 0, buffer_size);
+
+            for (i = 0; i < (buffer_size >> PAGE_SHIFT); i++) {
+                share_xen_page_with_privileged_guests(virt_to_page(ipt_buf) + i, SHARE_ro);
+            }
+
+            ptst->vcpu[v->vcpu_id].buf_mfn = virt_to_mfn(ipt_buf);
+            ptst->vcpu[v->vcpu_id].size = buffer_size;
+            ptst->vcpu[v->vcpu_id].offset = 0;
+
+            v->arch.hvm.vmx.ipt_state.public_state = &ptst->vcpu[v->vcpu_id];
+            v->arch.hvm.vmx.ipt_state.output_base = virt_to_mfn(ipt_buf) << PAGE_SHIFT;
+            v->arch.hvm.vmx.ipt_state.output_mask = buffer_size - 1;
+            v->arch.hvm.vmx.ipt_state.status = 0;
+            v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
+        }
+
+	d->arch.hvm.vmx.pub_ipt_state = ptst;
+    } else if (a.cmd == HVMOP_ipt_disable) {
+	ptst = d->arch.hvm.vmx.pub_ipt_state;
+
+	if (!ptst) {
+            rc = -EINVAL;
+	    goto out;
+	}
+
+	for_each_vcpu( d, v ) {
+            if (ptst->vcpu[v->vcpu_id].buf_mfn) {
+		v->arch.hvm.vmx.ipt_state.ctl = 0;
+                free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].size >> PAGE_SHIFT);
+	    }
+	}
+
+	d->arch.hvm.vmx.pub_ipt_state = NULL;
+	free_domheap_pages(virt_to_page(ptst), ptst->num_pages);
+    }
+
+    rc = -EFAULT;
+    if ( __copy_to_guest(arg, &a, 1) )
+      goto out;
+    rc = 0;
+
+ out:
+    if (a.cmd == HVMOP_ipt_enable && rc) {
+        // operation failed in the middle
+	// deallocate everytihng
+	for_each_vcpu( d, v ) {
+            if (ptst->vcpu[v->vcpu_id].buf_mfn) {
+		v->arch.hvm.vmx.ipt_state.ctl = 0;
+                free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].size >> PAGE_SHIFT);
+	    }
+	}
+
+	free_domheap_pages(virt_to_page(ptst), ptst->num_pages);
+    }
+
+    smp_wmb();
+    rcu_unlock_domain(d);
+
+    return rc;
+}
+
+DEFINE_XEN_GUEST_HANDLE(compat_hvm_ipt_op_t);
+
+
 static int hvmop_get_mem_type(
     XEN_GUEST_HANDLE_PARAM(xen_hvm_get_mem_type_t) arg)
 {
@@ -5077,6 +5223,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case HVMOP_altp2m:
         rc = current->hcall_compat ? compat_altp2m_op(arg) : do_altp2m_op(arg);
+        break;
+
+    case HVMOP_ipt:
+        rc = do_ipt_op(arg);
         break;
 
     default:

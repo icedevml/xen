@@ -361,6 +361,49 @@ struct xen_hvm_altp2m_op {
 typedef struct xen_hvm_altp2m_op xen_hvm_altp2m_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_op_t);
 
+/* HVMOP_ipt: Perform Intel Processor Trace operation */
+#define HVMOP_ipt 26
+
+#define HVMOP_IPT_INTERFACE_VERSION 0x00000001
+
+struct xen_hvm_ipt_op {
+    /* IN variable */
+    uint32_t version;   /* HVMOP_IPT_INTERFACE_VERSION */
+    uint32_t cmd;
+/* Enable/disable external Intel Processor Trace for given domain */
+#define HVMOP_ipt_enable      1
+#define HVMOP_ipt_disable     2
+    domid_t domain;
+    uint32_t order;
+
+    /* OUT variable */
+    uint64_t mfn;
+};
+typedef struct xen_hvm_ipt_op xen_hvm_ipt_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_ipt_op_t);
+
+#pragma pack(1)
+/*
+ * Per-vCPU state of IPT. Contains the information about MFN on which IPT
+ * output buffer is allocated, the current offset (how many bytes in the buffer
+ * are valid) and the output buffer size (in bytes).
+ */
+struct pt_vcpu_state {
+    uint32_t buf_mfn; /* Start MFN of the IPT buffer for this vCPU */
+    uint32_t offset; /* How many bytes were succesfully written to the IPT buffer */
+    uint32_t size; /* Size of the IPT buffer (in bytes) */
+};
+
+/*
+ * Global state of IPT for given domain.
+ */
+struct pt_state {
+    uint32_t num_pages; /* Number of pages this structure is occupying */
+    uint32_t num_vcpus; /* Number of vCPUS for which IPT was enabled */
+    struct pt_vcpu_state vcpu[]; /* Array of per-vCPU structures, max index: num_vcpus-1 */
+};
+#pragma pack()
+
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */
 
 /*
