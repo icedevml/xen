@@ -106,6 +106,14 @@ struct pi_blocking_vcpu {
     spinlock_t           *lock;
 };
 
+struct ipt_state {
+    uint32_t enabled;
+    uint64_t ctl;
+    uint64_t status;
+    uint64_t output_base;
+    uint64_t output_mask;
+};
+
 struct vmx_vcpu {
     /* Physical address of VMCS. */
     paddr_t              vmcs_pa;
@@ -188,6 +196,9 @@ struct vmx_vcpu {
      * pCPU and wakeup the related vCPU.
      */
     struct pi_blocking_vcpu pi_blocking;
+
+    /* State of Intel Processor Trace feature */
+    struct ipt_state     ipt_state;
 };
 
 int vmx_create_vmcs(struct vcpu *v);
@@ -287,6 +298,7 @@ extern u64 vmx_ept_vpid_cap;
 
 #define VMX_MISC_CR3_TARGET                     0x01ff0000
 #define VMX_MISC_VMWRITE_ALL                    0x20000000
+#define VMX_MISC_PT_SUPPORTED                   0x00004000
 
 #define VMX_TSC_MULTIPLIER_MAX                  0xffffffffffffffffULL
 

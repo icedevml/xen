@@ -470,6 +470,8 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     vmx_install_vlapic_mapping(v);
 
+    v->arch.hvm.vmx.ipt_state.ctl = 0;
+
     return 0;
 }
 
@@ -2475,6 +2477,7 @@ static bool __init has_if_pschange_mc(void)
 
 const struct hvm_function_table * __init start_vmx(void)
 {
+    u64 _vmx_misc_cap;
     set_in_cr4(X86_CR4_VMXE);
 
     if ( _vmx_cpu_up(true) )
@@ -2546,6 +2549,29 @@ const struct hvm_function_table * __init start_vmx(void)
     {
         vmx_function_table.set_guest_bndcfgs = vmx_set_guest_bndcfgs;
         vmx_function_table.get_guest_bndcfgs = vmx_get_guest_bndcfgs;
+    }
+
+    /* Check whether IPT is supported in VMX operation */
+    vmx_function_table.ipt_supported = 1;
+
+    if ( !cpu_has_ipt )
+    {
+        vmx_function_table.ipt_supported = 0;
+        printk("VMX: Missing support for Intel Processor Trace x86 feature.\n");
+    }
+
+    rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
+
+    if ( !( _vmx_misc_cap & VMX_MISC_PT_SUPPORTED ) )
+    {
+        vmx_function_table.ipt_supported = 0;
+        printk("VMX: Missing support for Intel Processor Trace in VMX operation, VMX_MISC caps: %llx\n",
+               (unsigned long long)_vmx_misc_cap);
+    }
+
+    if (vmx_function_table.ipt_supported)
+    {
+        printk("VMX: Intel Processor Trace is SUPPORTED");
     }
 
     setup_vmcs_dump();
@@ -3629,6 +3655,16 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
+    wrmsrl(MSR_IA32_RTIT_CTL, 0);
+
+    if (v->arch.hvm.vmx.ipt_state.ctl)
+    {
+        smp_rmb();
+
+        rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state.status);
+        rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state.output_mask);
+    }
+
     hvm_invalidate_regs_fields(regs);
 
     if ( paging_mode_hap(v->domain) )
@@ -4426,6 +4462,16 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
+    wrmsrl(MSR_IA32_RTIT_CTL, 0);
+
+    if (curr->arch.hvm.vmx.ipt_state.ctl)
+    {
+        wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
+        wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);
+        wrmsrl(MSR_IA32_RTIT_STATUS, curr->arch.hvm.vmx.ipt_state.status);
+        wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state.ctl);
+    }
+
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();
 
