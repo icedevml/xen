@@ -3729,7 +3729,8 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
-    wrmsrl(MSR_IA32_RTIT_CTL, 0);
+    if (v->vcpu_id == 0)
+        wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
     hvm_invalidate_regs_fields(regs);
 
@@ -4437,6 +4438,8 @@ static void lbr_fixup(void)
         bdf93_fixup();
 }
 
+//int superwtf = 0;
+
 /* Returns false if the vmentry has to be restarted */
 bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
 {
@@ -4445,8 +4448,8 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     u32 new_asid, old_asid;
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
-    p2m_type_t p2mt;
-    mfn_t mfn;
+    //p2m_type_t p2mt;
+    //mfn_t mfn;
     uint64_t ipt_status;
 
     /* Shadow EPTP can't be updated here because irqs are disabled */
@@ -4530,15 +4533,23 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
-    mfn = get_gfn_query(current->domain, 0xA70A3D70, &p2mt);
-    printk("mfn %llx\n", (unsigned long long)mfn);
+    /* mfn = mfn_x(get_gfn_query_unlocked(current->domain, 0xA70A0000 >> PAGE_SHIFT, &p2mt)) << PAGE_SHIFT;
+    printk("mfn1 %llx\n", (unsigned long long)mfn);
+    mfn = mfn & (~0x1FFFFULL);
+    printk("mfn2 %llx\n", (unsigned long long)mfn); */
 
     rdmsrl(MSR_IA32_RTIT_STATUS, ipt_status);
     printk("rtit status %llx\n", (unsigned long long)ipt_status);
 
-    wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, mfn);
-    wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x1FFF);
-    wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR);
+    printk("pt buf %d: %llx\n", curr->vcpu_id, (unsigned long long)get_pt_buf(curr->vcpu_id));
+
+    if (curr->vcpu_id == 0 && get_pt_buf(curr->vcpu_id)) {
+        wrmsrl(MSR_IA32_RTIT_CTL, 0);
+        wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, get_pt_buf(curr->vcpu_id));
+        wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x7FFF);
+        wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR);
+        //superwtf = 1;
+    }
 
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();

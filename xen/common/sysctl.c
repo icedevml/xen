@@ -70,6 +70,10 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
         ret = tb_control(&op->u.tbuf_op);
         break;
 
+    case XEN_SYSCTL_ptbuf_op:
+	ret = ptbuf_control(&op->u.ptbuf_op);
+	break;
+
     case XEN_SYSCTL_sched_id:
         op->u.sched_id.sched_id = sched_id();
         break;

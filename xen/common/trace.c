@@ -64,6 +64,9 @@ static u32 t_buf_highwater;
 static DEFINE_PER_CPU(unsigned long, lost_records);
 static DEFINE_PER_CPU(unsigned long, lost_records_first_tsc);
 
+uint64_t pt_buf;
+//static DEFINE_PER_CPU(unsigned long, pt_buf);
+
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
 int tb_init_done __read_mostly;
@@ -360,6 +363,56 @@ void __init init_trace_bufs(void)
             tb_init_done=1;
         }
     }
+}
+
+int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
+{
+	static DEFINE_SPINLOCK(lock);
+	int rc = 0;
+	void* alheap;
+	int i;
+
+	spin_lock(&lock);
+
+	switch ( ptbop->cmd )
+	{
+	case XEN_SYSCTL_PTBUFOP_alloc:
+                    alheap = alloc_xenheap_pages(ptbop->order, 0);
+
+                    if (!alheap) {
+                        rc = -EINVAL;
+                        break;
+                    }
+
+                    memset(alheap, 0, PAGE_SIZE * (1 << ptbop->order));
+
+                    for (i = 0; i < (1 << ptbop->order); i++) {
+                        share_xen_page_with_privileged_guests(virt_to_page(alheap) + i, SHARE_ro);
+    	            }
+
+                    // per_cpu(pt_buf, i) = virt_to_mfn(alheap);
+		    pt_buf = virt_to_mfn(alheap);
+		    pt_buf <<= PAGE_SHIFT;
+                    ptbop->buffer_mfn = virt_to_mfn(alheap);
+
+		smp_wmb();
+		break;
+	default:
+		rc = -EINVAL;
+		break;
+	}
+
+	spin_unlock(&lock);
+
+	return rc;
+}
+
+uint64_t get_pt_buf(unsigned long cpu)
+{
+	if (cpu == 0)
+            return pt_buf;
+
+	return 0;
 }
 
 /**

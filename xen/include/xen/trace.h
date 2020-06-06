@@ -33,6 +33,10 @@ void init_trace_bufs(void);
 /* used to retrieve the physical address of the trace buffers */
 int tb_control(struct xen_sysctl_tbuf_op *tbc);
 
+int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop);
+
+uint64_t get_pt_buf(unsigned long cpu);
+
 int trace_will_trace_event(u32 event);
 
 void __trace_var(u32 event, bool_t cycles, unsigned int extra, const void *);
