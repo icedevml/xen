@@ -98,7 +98,7 @@ int xc_ptbuf_alloc(xc_interface *xch, unsigned long order, void **mapped_buf)
         mfn = sysctl.u.ptbuf_op.buffer_mfn;
 	printf("Allocated MFN %llx\n", (unsigned long long)mfn);
         buf = xc_map_foreign_range(xch, DOMID_XEN,
-                    0x1000, PROT_READ, mfn);
+                    1 << (order + PAGE_SHIFT), PROT_READ, mfn);
 	printf("Buf %llx\n", (unsigned long long)buf);
 	*mapped_buf = buf;
     }

@@ -3724,13 +3724,18 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     unsigned int vector = 0, mode;
     struct vcpu *v = current;
     struct domain *currd = v->domain;
+    uint64_t ipt_status;
 
     __vmread(GUEST_RIP,    &regs->rip);
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
-    if (v->vcpu_id == 0)
+    if (v->vcpu_id == 0) {
+        rdmsrl(MSR_IA32_RTIT_STATUS, ipt_status);
+        printk("vmexit ipt status: %llx\n", (unsigned long long)ipt_status);
+
         wrmsrl(MSR_IA32_RTIT_CTL, 0);
+    }
 
     hvm_invalidate_regs_fields(regs);
 
@@ -4533,21 +4538,18 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
-    /* mfn = mfn_x(get_gfn_query_unlocked(current->domain, 0xA70A0000 >> PAGE_SHIFT, &p2mt)) << PAGE_SHIFT;
-    printk("mfn1 %llx\n", (unsigned long long)mfn);
-    mfn = mfn & (~0x1FFFFULL);
-    printk("mfn2 %llx\n", (unsigned long long)mfn); */
+    // beware that vCPU may be rescheduled and we would have to adjust registers accordingly
 
-    rdmsrl(MSR_IA32_RTIT_STATUS, ipt_status);
-    printk("rtit status %llx\n", (unsigned long long)ipt_status);
-
-    printk("pt buf %d: %llx\n", curr->vcpu_id, (unsigned long long)get_pt_buf(curr->vcpu_id));
+    if (curr->vcpu_id == 0) {
+        rdmsrl(MSR_IA32_RTIT_STATUS, ipt_status);
+        printk("vmenter ipt status: %llx (pt buf %d: %llx)\n", (unsigned long long)ipt_status, curr->vcpu_id, (unsigned long long)get_pt_buf(curr->vcpu_id));
+    }
 
     if (curr->vcpu_id == 0 && get_pt_buf(curr->vcpu_id)) {
 	if (!superwtf) {
-        wrmsrl(MSR_IA32_RTIT_CTL, 0);
-        wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, get_pt_buf(curr->vcpu_id));
-        wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x7FFF);
+            wrmsrl(MSR_IA32_RTIT_CTL, 0);
+            wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, get_pt_buf(curr->vcpu_id));
+            wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x7FFFFFF);
 	}
         wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN);
         superwtf = 1;
