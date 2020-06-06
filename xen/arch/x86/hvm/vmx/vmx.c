@@ -4438,7 +4438,7 @@ static void lbr_fixup(void)
         bdf93_fixup();
 }
 
-//int superwtf = 0;
+int superwtf = 0;
 
 /* Returns false if the vmentry has to be restarted */
 bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
@@ -4544,11 +4544,13 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     printk("pt buf %d: %llx\n", curr->vcpu_id, (unsigned long long)get_pt_buf(curr->vcpu_id));
 
     if (curr->vcpu_id == 0 && get_pt_buf(curr->vcpu_id)) {
+	if (!superwtf) {
         wrmsrl(MSR_IA32_RTIT_CTL, 0);
         wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, get_pt_buf(curr->vcpu_id));
         wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x7FFF);
-        wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR);
-        //superwtf = 1;
+	}
+        wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN);
+        superwtf = 1;
     }
 
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
