@@ -408,9 +408,10 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
 			pt_buf <<= PAGE_SHIFT;
 			ptbop->buffer_mfn[v->vcpu_id] = virt_to_mfn(alheap);
 
-			v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
 			v->arch.hvm.vmx.ipt_state.output_base = pt_buf;
 			v->arch.hvm.vmx.ipt_state.output_mask = ptbop->buffer_size - 1;
+			v->arch.hvm.vmx.ipt_state.status = 0;
+			v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
 		}
 		rcu_unlock_domain(d);
 

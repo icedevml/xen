@@ -3731,6 +3731,12 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
+    if (v->arch.hvm.vmx.ipt_state.ctl)
+    {
+        rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state.status);
+	printk("IPT status: %llx", (unsigned long long)v->arch.hvm.vmx.ipt_state.status);
+    }
+
     hvm_invalidate_regs_fields(regs);
 
     if ( paging_mode_hap(v->domain) )
@@ -4535,6 +4541,7 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     {
         wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
         wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);
+        wrmsrl(MSR_IA32_RTIT_STATUS, curr->arch.hvm.vmx.ipt_state.status);
         wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state.ctl);
     }
 
