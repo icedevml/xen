@@ -408,11 +408,6 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
 			pt_buf <<= PAGE_SHIFT;
 			ptbop->buffer_mfn[v->vcpu_id] = virt_to_mfn(alheap);
 
-			/* if (!v->arch.hvm.vmx.ipt_state.supported) {
-                                rc = -EOPNOTSUPP;
-				break;
-			} */
-
 			v->arch.hvm.vmx.ipt_state.output_base = pt_buf;
 			v->arch.hvm.vmx.ipt_state.output_mask = ptbop->buffer_size - 1;
 		        v->arch.hvm.vmx.ipt_state.status = 0;

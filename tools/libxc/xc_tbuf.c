@@ -79,28 +79,35 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
     return rc;
 }
 
-int xc_ptbuf_alloc(xc_interface *xch, unsigned long order, void **mapped_buf)
+int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void **mapped_buf)
 {
     DECLARE_SYSCTL;
     int rc = -1;
     unsigned long mfn;
     void *buf;
+    int i;
 
     sysctl.cmd = XEN_SYSCTL_ptbuf_op;
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
     sysctl.u.ptbuf_op.cmd  = XEN_SYSCTL_PTBUFOP_alloc;
+    sysctl.u.ptbuf_op.domain = domid;
     sysctl.u.ptbuf_op.order = order;
-    sysctl.u.ptbuf_op.buffer_mfn[0] = 0;
 
     rc = xc_sysctl(xch, &sysctl);
     if ( rc == 0 )
     {
-        mfn = sysctl.u.ptbuf_op.buffer_mfn[0];
-	printf("Allocated MFN %llx\n", (unsigned long long)mfn);
-        buf = xc_map_foreign_range(xch, DOMID_XEN,
-                    1 << (order + PAGE_SHIFT), PROT_READ, mfn);
-	printf("Buf %llx\n", (unsigned long long)buf);
-	*mapped_buf = buf;
+        for (i = 0; i < 8; i++)
+        {
+            mfn = sysctl.u.ptbuf_op.buffer_mfn[i];
+            printf("Allocated MFN %d %llx\n", i, (unsigned long long)mfn);
+
+	    if (mfn) {
+                buf = xc_map_foreign_range(xch, DOMID_XEN,
+                        1 << (order + PAGE_SHIFT), PROT_READ, mfn);
+                printf("Buf %llx\n", (unsigned long long)buf);
+                mapped_buf[i] = buf;
+	    }
+	}
     }
 
     return rc;
