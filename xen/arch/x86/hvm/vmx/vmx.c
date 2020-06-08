@@ -470,6 +470,8 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     vmx_install_vlapic_mapping(v);
 
+    v->arch.hvm.vmx.ipt_state.ctl = 0;
+
     return 0;
 }
 
