@@ -3724,18 +3724,12 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     unsigned int vector = 0, mode;
     struct vcpu *v = current;
     struct domain *currd = v->domain;
-    uint64_t ipt_status;
 
     __vmread(GUEST_RIP,    &regs->rip);
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
-    if (v->vcpu_id == 0) {
-        rdmsrl(MSR_IA32_RTIT_STATUS, ipt_status);
-        printk("vmexit ipt status: %llx\n", (unsigned long long)ipt_status);
-
-        wrmsrl(MSR_IA32_RTIT_CTL, 0);
-    }
+    wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
     hvm_invalidate_regs_fields(regs);
 
@@ -4453,9 +4447,6 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     u32 new_asid, old_asid;
     struct hvm_vcpu_asid *p_asid;
     bool_t need_flush;
-    //p2m_type_t p2mt;
-    //mfn_t mfn;
-    uint64_t ipt_status;
 
     /* Shadow EPTP can't be updated here because irqs are disabled */
      if ( nestedhvm_vcpu_in_guestmode(curr) && vcpu_nestedhvm(curr).stale_np2m )
@@ -4538,21 +4529,13 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
-    // beware that vCPU may be rescheduled and we would have to adjust registers accordingly
+    wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
-    if (curr->vcpu_id == 0) {
-        rdmsrl(MSR_IA32_RTIT_STATUS, ipt_status);
-        printk("vmenter ipt status: %llx (pt buf %d: %llx)\n", (unsigned long long)ipt_status, curr->vcpu_id, (unsigned long long)get_pt_buf(curr->vcpu_id));
-    }
-
-    if (curr->vcpu_id == 0 && get_pt_buf(curr->vcpu_id)) {
-	if (!superwtf) {
-            wrmsrl(MSR_IA32_RTIT_CTL, 0);
-            wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, get_pt_buf(curr->vcpu_id));
-            wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, 0x7FFFFFF);
-	}
-        wrmsrl(MSR_IA32_RTIT_CTL, RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN);
-        superwtf = 1;
+    if (curr->arch.hvm.vmx.ipt_state.ctl)
+    {
+        wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
+        wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);
+        wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state.ctl);
     }
 
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )

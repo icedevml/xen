@@ -371,29 +371,48 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
 	int rc = 0;
 	void* alheap;
 	int i;
+	struct domain *d = NULL;
+	struct vcpu *v;
 
 	spin_lock(&lock);
 
 	switch ( ptbop->cmd )
 	{
 	case XEN_SYSCTL_PTBUFOP_alloc:
-                    alheap = alloc_xenheap_pages(ptbop->order, 0);
+		d = rcu_lock_domain_by_any_id(ptbop->domain);
+		ptbop->buffer_size = (1 << ptbop->order) << PAGE_SHIFT;
 
-                    if (!alheap) {
-                        rc = -EINVAL;
-                        break;
-                    }
+		// TODO no support for >8 vCPU
+		for (i = 0; i < 8; i++)
+		{
+                        ptbop->buffer_mfn[i] = 0;
+		}
 
-                    memset(alheap, 0, PAGE_SIZE * (1 << ptbop->order));
+		for_each_vcpu ( d, v )
+		{
+			alheap = alloc_xenheap_pages(ptbop->order, 0);
 
-                    for (i = 0; i < (1 << ptbop->order); i++) {
-                        share_xen_page_with_privileged_guests(virt_to_page(alheap) + i, SHARE_ro);
-    	            }
+			if (!alheap) {
+				// TODO dealloc
+				rc = -EINVAL;
+				break;
+			}
 
-                    // per_cpu(pt_buf, i) = virt_to_mfn(alheap);
-		    pt_buf = virt_to_mfn(alheap);
-		    pt_buf <<= PAGE_SHIFT;
-                    ptbop->buffer_mfn = virt_to_mfn(alheap);
+			memset(alheap, 0, ptbop->buffer_size);
+
+			for (i = 0; i < (ptbop->buffer_size >> PAGE_SHIFT); i++) {
+				share_xen_page_with_privileged_guests(virt_to_page(alheap) + i, SHARE_ro);
+			}
+
+			pt_buf = virt_to_mfn(alheap);
+			pt_buf <<= PAGE_SHIFT;
+			ptbop->buffer_mfn[v->vcpu_id] = virt_to_mfn(alheap);
+
+			v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
+			v->arch.hvm.vmx.ipt_state.output_base = pt_buf;
+			v->arch.hvm.vmx.ipt_state.output_mask = ptbop->buffer_size - 1;
+		}
+		rcu_unlock_domain(d);
 
 		smp_wmb();
 		break;
@@ -405,14 +424,6 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
 	spin_unlock(&lock);
 
 	return rc;
-}
-
-uint64_t get_pt_buf(unsigned long cpu)
-{
-	if (cpu == 0)
-            return pt_buf;
-
-	return 0;
 }
 
 /**

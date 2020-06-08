@@ -83,10 +83,13 @@ struct xen_sysctl_tbuf_op {
 struct xen_sysctl_ptbuf_op {
     /* IN variables */
 #define XEN_SYSCTL_PTBUFOP_alloc       0
+    domid_t domain;
     uint32_t cmd;
     uint32_t order;
+
     /* OUT variables */
-    uint64_aligned_t buffer_mfn;
+    uint64_aligned_t buffer_mfn[8];
+    uint64_aligned_t buffer_size;
 };
 
 /*

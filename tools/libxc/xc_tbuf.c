@@ -90,12 +90,12 @@ int xc_ptbuf_alloc(xc_interface *xch, unsigned long order, void **mapped_buf)
     sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
     sysctl.u.ptbuf_op.cmd  = XEN_SYSCTL_PTBUFOP_alloc;
     sysctl.u.ptbuf_op.order = order;
-    sysctl.u.ptbuf_op.buffer_mfn = 0;
+    sysctl.u.ptbuf_op.buffer_mfn[0] = 0;
 
     rc = xc_sysctl(xch, &sysctl);
     if ( rc == 0 )
     {
-        mfn = sysctl.u.ptbuf_op.buffer_mfn;
+        mfn = sysctl.u.ptbuf_op.buffer_mfn[0];
 	printf("Allocated MFN %llx\n", (unsigned long long)mfn);
         buf = xc_map_foreign_range(xch, DOMID_XEN,
                     1 << (order + PAGE_SHIFT), PROT_READ, mfn);
