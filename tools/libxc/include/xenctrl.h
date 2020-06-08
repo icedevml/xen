@@ -1586,7 +1586,7 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, xc_cpumap_t mask);
 
 int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask);
 
-int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void **mapped_buf);
+int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void **mapped_buf, uint32_t **offsets);
 
 int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
 int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);

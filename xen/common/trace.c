@@ -32,6 +32,7 @@
 #include <xen/cpu.h>
 #include <asm/atomic.h>
 #include <public/sysctl.h>
+#include <public/trace.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/trace.h>
@@ -369,10 +370,12 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
 {
 	static DEFINE_SPINLOCK(lock);
 	int rc = 0;
-	void* alheap;
+	void* ipt_buf;
 	int i;
 	struct domain *d = NULL;
 	struct vcpu *v;
+	struct pt_state* ptst;
+	uint32_t buffer_size;
 
 	spin_lock(&lock);
 
@@ -380,42 +383,57 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
 	{
 	case XEN_SYSCTL_PTBUFOP_alloc:
 		d = rcu_lock_domain_by_any_id(ptbop->domain);
-		ptbop->buffer_size = (1 << ptbop->order) << PAGE_SHIFT;
 
-		// TODO no support for >8 vCPU
-		for (i = 0; i < 8; i++)
-		{
-                        ptbop->buffer_mfn[i] = 0;
-		}
+		// TODO what if size of ptst exceeds 4 kB?
+		ptst = (struct pt_state *)alloc_xenheap_pages(0, 0);
+		memset(ptst, 0, PAGE_SIZE);
+		share_xen_page_with_privileged_guests(virt_to_page(ptst), SHARE_ro);
+		ptbop->mfn = virt_to_mfn(ptst);
+
+		ptst->num_vcpus = 0;
+
+		buffer_size = (1 << ptbop->order) << PAGE_SHIFT;
+
+		printk("doing\n");
 
 		for_each_vcpu ( d, v )
 		{
-			alheap = alloc_xenheap_pages(ptbop->order, 0);
-
-			if (!alheap) {
+			printk("Processing for vcpu %d\n", v->vcpu_id);
+			ipt_buf = alloc_xenheap_pages(ptbop->order, 0);
+			
+			if (!ipt_buf) {
 				// TODO dealloc
 				rc = -EINVAL;
 				break;
 			}
 
-			memset(alheap, 0, ptbop->buffer_size);
-
-			for (i = 0; i < (ptbop->buffer_size >> PAGE_SHIFT); i++) {
-				share_xen_page_with_privileged_guests(virt_to_page(alheap) + i, SHARE_ro);
+			if (ptst->num_vcpus < v->vcpu_id) {
+                                ptst->num_vcpus = v->vcpu_id + 1;
 			}
 
-			pt_buf = virt_to_mfn(alheap);
-			pt_buf <<= PAGE_SHIFT;
-			ptbop->buffer_mfn[v->vcpu_id] = virt_to_mfn(alheap);
+			buffer_size = (1 << ptbop->order) << PAGE_SHIFT;
+			memset(ipt_buf, 0, buffer_size);
 
-			v->arch.hvm.vmx.ipt_state.output_base = pt_buf;
-			v->arch.hvm.vmx.ipt_state.output_mask = ptbop->buffer_size - 1;
+			for (i = 0; i < (buffer_size >> PAGE_SHIFT); i++) {
+				share_xen_page_with_privileged_guests(virt_to_page(ipt_buf) + i, SHARE_ro);
+			}
+
+			ptst->vcpu[v->vcpu_id].buf_mfn = virt_to_mfn(ipt_buf);
+			ptst->vcpu[v->vcpu_id].size = buffer_size;
+			ptst->vcpu[v->vcpu_id].offset = 0;
+
+			v->arch.hvm.vmx.ipt_state.public_state = &ptst->vcpu[v->vcpu_id];
+			v->arch.hvm.vmx.ipt_state.output_base = virt_to_mfn(ipt_buf) << PAGE_SHIFT;
+			v->arch.hvm.vmx.ipt_state.output_mask = buffer_size - 1;
 		        v->arch.hvm.vmx.ipt_state.status = 0;
 		        v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
+			printk("done\n");
 		}
-		rcu_unlock_domain(d);
+
+		printk("return %d\n", ptst->num_vcpus);
 
 		smp_wmb();
+		rcu_unlock_domain(d);
 		break;
 	default:
 		rc = -EINVAL;

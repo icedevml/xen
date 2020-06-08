@@ -328,6 +328,19 @@ struct t_info {
     /* MFN lists immediately after the header */
 };
 
+#pragma pack(1)
+struct pt_vcpu_state {
+	uint32_t buf_mfn; /* Start MFN of the IPT buffer for this vCPU */
+	uint32_t offset; /* How many bytes were succesfully written to the IPT buffer */
+	uint32_t size; /* Size of the IPT buffer (in bytes) */
+};
+
+struct pt_state {
+	uint32_t num_vcpus; /* Number of vCPUS for which IPT was enabled */
+	struct pt_vcpu_state vcpu[]; /* Array of per-vCPU structures, max index: num_vcpus-1 */
+};
+#pragma pack()
+
 #endif /* __XEN_PUBLIC_TRACE_H__ */
 
 /*

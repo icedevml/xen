@@ -88,8 +88,7 @@ struct xen_sysctl_ptbuf_op {
     uint32_t order;
 
     /* OUT variables */
-    uint64_aligned_t buffer_mfn[8];
-    uint64_aligned_t buffer_size;
+    uint64_aligned_t mfn;
 };
 
 /*

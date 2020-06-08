@@ -79,11 +79,12 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
     return rc;
 }
 
-int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void **mapped_buf)
+int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void **mapped_buf, uint32_t **offsets)
 {
     DECLARE_SYSCTL;
     int rc = -1;
     unsigned long mfn;
+    struct pt_state *ptst;
     void *buf;
     int i;
 
@@ -96,16 +97,25 @@ int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void 
     rc = xc_sysctl(xch, &sysctl);
     if ( rc == 0 )
     {
-        for (i = 0; i < 8; i++)
+        mfn = sysctl.u.ptbuf_op.mfn;
+	ptst = (struct pt_state *)xc_map_foreign_range(xch, DOMID_XEN, PAGE_SIZE, PROT_READ, mfn);
+
+	// TODO fixme
+	for (i = 0; i < 8; i++)
+	{
+            mapped_buf[i] = 0;
+	    offsets[i] = 0;
+	}
+
+        for (i = 0; i < ptst->num_vcpus; i++)
         {
-            mfn = sysctl.u.ptbuf_op.buffer_mfn[i];
             printf("Allocated MFN %d %llx\n", i, (unsigned long long)mfn);
 
-	    if (mfn) {
-                buf = xc_map_foreign_range(xch, DOMID_XEN,
-                        1 << (order + PAGE_SHIFT), PROT_READ, mfn);
+	    if (ptst->vcpu[i].buf_mfn) {
+                buf = xc_map_foreign_range(xch, DOMID_XEN, ptst->vcpu[i].size, PROT_READ, ptst->vcpu[i].buf_mfn);
                 printf("Buf %llx\n", (unsigned long long)buf);
                 mapped_buf[i] = buf;
+		offsets[i] = &ptst->vcpu[i].offset;
 	    }
 	}
     }

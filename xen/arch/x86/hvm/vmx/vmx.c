@@ -3735,8 +3735,16 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
     if (v->arch.hvm.vmx.ipt_state.ctl)
     {
+        smp_rmb();
+
         rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state.status);
-	printk("IPT EXIT (%d): %016llx\n", v->vcpu_id, (unsigned long long)v->arch.hvm.vmx.ipt_state.status);
+        rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state.output_mask);
+
+	v->arch.hvm.vmx.ipt_state.public_state->offset = (v->arch.hvm.vmx.ipt_state.output_mask >> 32);
+
+	//printk("IPT EXIT (%d): %016llx mask: %016llx\n", v->vcpu_id,
+        //    (unsigned long long)v->arch.hvm.vmx.ipt_state.status,
+        //    (unsigned long long)v->arch.hvm.vmx.ipt_state.output_mask);
     }
 
     hvm_invalidate_regs_fields(regs);
@@ -4541,7 +4549,7 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
 
     if (curr->arch.hvm.vmx.ipt_state.ctl)
     {
-        printk("IPT ENTR (%d): %016llx ctl: %016llx\n", curr->vcpu_id, (unsigned long long)curr->arch.hvm.vmx.ipt_state.status, (unsigned long long)curr->arch.hvm.vmx.ipt_state.ctl);
+        // printk("IPT ENTR (%d): %016llx ctl: %016llx mask: %016llx\n", curr->vcpu_id, (unsigned long long)curr->arch.hvm.vmx.ipt_state.status, (unsigned long long)curr->arch.hvm.vmx.ipt_state.ctl, (unsigned long long)curr->arch.hvm.vmx.ipt_state.output_mask);
 
         wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
         wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);

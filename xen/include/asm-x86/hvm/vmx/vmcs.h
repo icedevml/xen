@@ -20,6 +20,7 @@
 
 #include <asm/hvm/io.h>
 #include <irq_vectors.h>
+#include <public/trace.h>
 
 extern void vmcs_dump_vcpu(struct vcpu *v);
 extern void setup_vmcs_dump(void);
@@ -111,6 +112,7 @@ struct ipt_state {
     uint64_t status;
     uint64_t output_base;
     uint64_t output_mask;
+    struct pt_vcpu_state *public_state;
 };
 
 struct vmx_vcpu {
