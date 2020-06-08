@@ -591,10 +591,10 @@
 #define RTIT_CTL_FABRIC_EN             (1ULL << 6)
 #define RTIT_CTL_CR3_FILTER            (1ULL << 7)
 #define RTIT_CTL_TOPA                  (1ULL << 8)
-#define RTIT_CTL_MTC_EN                        (1ULL << 9)
-#define RTIT_CTL_TSC_EN                        (1ULL << 10)
+#define RTIT_CTL_MTC_EN                (1ULL << 9)
+#define RTIT_CTL_TSC_EN                (1ULL << 10)
 #define RTIT_CTL_DIS_RETC              (1ULL << 11)
-#define RTIT_CTL_PTW_EN                        (1ULL << 12)
+#define RTIT_CTL_PTW_EN                (1ULL << 12)
 #define RTIT_CTL_BRANCH_EN             (1ULL << 13)
 #define RTIT_CTL_MTC_FREQ_OFFSET       14
 #define RTIT_CTL_MTC_FREQ              (0x0fULL << RTIT_CTL_MTC_FREQ_OFFSET)
@@ -602,7 +602,7 @@
 #define RTIT_CTL_CYC_THRESH            (0x0fULL << RTIT_CTL_CYC_THRESH_OFFSET)
 #define RTIT_CTL_PSB_FREQ_OFFSET       24
 #define RTIT_CTL_PSB_FREQ              (0x0fULL << RTIT_CTL_PSB_FREQ_OFFSET)
-#define RTIT_CTL_ADDR_OFFSET(n)                (32 + 4 * (n))
+#define RTIT_CTL_ADDR_OFFSET(n)        (32 + 4 * (n))
 #define RTIT_CTL_ADDR(n)               (0x0fULL << RTIT_CTL_ADDR_OFFSET(n))
 #define MSR_IA32_RTIT_STATUS           0x00000571
 #define RTIT_STATUS_FILTER_EN          (1ULL << 0)
@@ -611,10 +611,10 @@
 #define RTIT_STATUS_ERROR              (1ULL << 4)
 #define RTIT_STATUS_STOPPED            (1ULL << 5)
 #define RTIT_STATUS_BYTECNT            (0x1ffffULL << 32)
-#define MSR_IA32_RTIT_CR3_MATCH                0x00000572
+#define MSR_IA32_RTIT_CR3_MATCH        0x00000572
 #define MSR_IA32_RTIT_OUTPUT_BASE      0x00000560
 #define MSR_IA32_RTIT_OUTPUT_MASK      0x00000561
-#define MSR_IA32_RTIT_ADDR_A(n)                (0x00000580 + (n) * 2)
-#define MSR_IA32_RTIT_ADDR_B(n)                (0x00000581 + (n) * 2)
+#define MSR_IA32_RTIT_ADDR_A(n)        (0x00000580 + (n) * 2)
+#define MSR_IA32_RTIT_ADDR_B(n)        (0x00000581 + (n) * 2)
 
 #endif /* __ASM_MSR_INDEX_H */

@@ -536,7 +536,7 @@ static int vmx_init_vmcs_config(void)
     if ( !cpu_has_ipt )
     {
         ipt_supported = 0;
-	printk("VMX: CPU%d doesn't support Intel Processor Trace x86 feature.\n",
+        printk("VMX: CPU%d doesn't support Intel Processor Trace x86 feature.\n",
                smp_processor_id());
     }
 

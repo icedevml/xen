@@ -72,14 +72,14 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
     if ( t_info == NULL || t_info->tbuf_size == 0 )
         rc = -1;
     else
-	*size = t_info->tbuf_size;
+    *size = t_info->tbuf_size;
 
     xenforeignmemory_unmap(xch->fmem, t_info, sysctl.u.tbuf_op.size);
 
     return rc;
 }
 
-int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void **mapped_buf, uint32_t **offsets)
+int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out)
 {
     DECLARE_SYSCTL;
     int rc = -1;
@@ -98,26 +98,25 @@ int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void 
     if ( rc == 0 )
     {
         mfn = sysctl.u.ptbuf_op.mfn;
-	ptst = (struct pt_state *)xc_map_foreign_range(xch, DOMID_XEN, PAGE_SIZE, PROT_READ, mfn);
+        ptst = (struct pt_state *)xc_map_foreign_range(xch, DOMID_XEN, PAGE_SIZE, PROT_READ, mfn);
 
-	// TODO fixme
-	for (i = 0; i < 8; i++)
-	{
-            mapped_buf[i] = 0;
-	    offsets[i] = 0;
-	}
+        out->num_vcpus = ptst->num_vcpus;
+        out->pt_buf = (void **)malloc(ptst->num_vcpus * sizeof(void *));
+        out->state = (struct pt_vcpu_state **)malloc(ptst->num_vcpus * sizeof(struct pt_vcpu_state *));
 
         for (i = 0; i < ptst->num_vcpus; i++)
         {
-            printf("Allocated MFN %d %llx\n", i, (unsigned long long)mfn);
+            printf("IPT buffer vCPU: %d MFN: %llx\n", i, (unsigned long long)ptst->vcpu[i].buf_mfn);
+            out->pt_buf[i] = NULL;
+	    out->state[i] = NULL;
 
-	    if (ptst->vcpu[i].buf_mfn) {
+            if (ptst->vcpu[i].buf_mfn) {
                 buf = xc_map_foreign_range(xch, DOMID_XEN, ptst->vcpu[i].size, PROT_READ, ptst->vcpu[i].buf_mfn);
-                printf("Buf %llx\n", (unsigned long long)buf);
-                mapped_buf[i] = buf;
-		offsets[i] = &ptst->vcpu[i].offset;
-	    }
-	}
+                printf("Mapped buffer: %llx\n", (unsigned long long)buf);
+                out->pt_buf[i] = buf;
+                out->state[i] = &ptst->vcpu[i];
+            }
+        }
     }
 
     return rc;

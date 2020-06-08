@@ -65,9 +65,6 @@ static u32 t_buf_highwater;
 static DEFINE_PER_CPU(unsigned long, lost_records);
 static DEFINE_PER_CPU(unsigned long, lost_records_first_tsc);
 
-uint64_t pt_buf;
-//static DEFINE_PER_CPU(unsigned long, pt_buf);
-
 /* a flag recording whether initialization has been done */
 /* or more properly, if the tbuf subsystem is enabled right now */
 int tb_init_done __read_mostly;
@@ -368,81 +365,74 @@ void __init init_trace_bufs(void)
 
 int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
 {
-	static DEFINE_SPINLOCK(lock);
-	int rc = 0;
-	void* ipt_buf;
-	int i;
-	struct domain *d = NULL;
-	struct vcpu *v;
-	struct pt_state* ptst;
-	uint32_t buffer_size;
+    static DEFINE_SPINLOCK(lock);
+    int rc = 0;
+    void* ipt_buf;
+    int i;
+    struct domain *d = NULL;
+    struct vcpu *v;
+    struct pt_state* ptst;
+    uint32_t buffer_size;
 
-	spin_lock(&lock);
+    spin_lock(&lock);
 
-	switch ( ptbop->cmd )
-	{
-	case XEN_SYSCTL_PTBUFOP_alloc:
-		d = rcu_lock_domain_by_any_id(ptbop->domain);
+    switch ( ptbop->cmd )
+    {
+    case XEN_SYSCTL_PTBUFOP_alloc:
+        d = rcu_lock_domain_by_any_id(ptbop->domain);
 
-		// TODO what if size of ptst exceeds 4 kB?
-		ptst = (struct pt_state *)alloc_xenheap_pages(0, 0);
-		memset(ptst, 0, PAGE_SIZE);
-		share_xen_page_with_privileged_guests(virt_to_page(ptst), SHARE_ro);
-		ptbop->mfn = virt_to_mfn(ptst);
+        // TODO what if size of ptst exceeds 4 kB?
+        ptst = (struct pt_state *)alloc_xenheap_pages(0, 0);
+        memset(ptst, 0, PAGE_SIZE);
+        share_xen_page_with_privileged_guests(virt_to_page(ptst), SHARE_ro);
+        ptbop->mfn = virt_to_mfn(ptst);
 
-		ptst->num_vcpus = 0;
+        ptst->num_vcpus = 0;
+        buffer_size = (1 << ptbop->order) << PAGE_SHIFT;
 
-		buffer_size = (1 << ptbop->order) << PAGE_SHIFT;
+        for_each_vcpu ( d, v )
+        {
+            ipt_buf = alloc_xenheap_pages(ptbop->order, 0);
 
-		printk("doing\n");
+            if (!ipt_buf) {
+                // TODO dealloc
+                rc = -EINVAL;
+                break;
+            }
 
-		for_each_vcpu ( d, v )
-		{
-			printk("Processing for vcpu %d\n", v->vcpu_id);
-			ipt_buf = alloc_xenheap_pages(ptbop->order, 0);
-			
-			if (!ipt_buf) {
-				// TODO dealloc
-				rc = -EINVAL;
-				break;
-			}
+            if (ptst->num_vcpus < v->vcpu_id) {
+                ptst->num_vcpus = v->vcpu_id + 1;
+            }
 
-			if (ptst->num_vcpus < v->vcpu_id) {
-                                ptst->num_vcpus = v->vcpu_id + 1;
-			}
+            buffer_size = (1 << ptbop->order) << PAGE_SHIFT;
+            memset(ipt_buf, 0, buffer_size);
 
-			buffer_size = (1 << ptbop->order) << PAGE_SHIFT;
-			memset(ipt_buf, 0, buffer_size);
+            for (i = 0; i < (buffer_size >> PAGE_SHIFT); i++) {
+                share_xen_page_with_privileged_guests(virt_to_page(ipt_buf) + i, SHARE_ro);
+            }
 
-			for (i = 0; i < (buffer_size >> PAGE_SHIFT); i++) {
-				share_xen_page_with_privileged_guests(virt_to_page(ipt_buf) + i, SHARE_ro);
-			}
+            ptst->vcpu[v->vcpu_id].buf_mfn = virt_to_mfn(ipt_buf);
+            ptst->vcpu[v->vcpu_id].size = buffer_size;
+            ptst->vcpu[v->vcpu_id].offset = 0;
 
-			ptst->vcpu[v->vcpu_id].buf_mfn = virt_to_mfn(ipt_buf);
-			ptst->vcpu[v->vcpu_id].size = buffer_size;
-			ptst->vcpu[v->vcpu_id].offset = 0;
+            v->arch.hvm.vmx.ipt_state.public_state = &ptst->vcpu[v->vcpu_id];
+            v->arch.hvm.vmx.ipt_state.output_base = virt_to_mfn(ipt_buf) << PAGE_SHIFT;
+            v->arch.hvm.vmx.ipt_state.output_mask = buffer_size - 1;
+            v->arch.hvm.vmx.ipt_state.status = 0;
+            v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
+        }
 
-			v->arch.hvm.vmx.ipt_state.public_state = &ptst->vcpu[v->vcpu_id];
-			v->arch.hvm.vmx.ipt_state.output_base = virt_to_mfn(ipt_buf) << PAGE_SHIFT;
-			v->arch.hvm.vmx.ipt_state.output_mask = buffer_size - 1;
-		        v->arch.hvm.vmx.ipt_state.status = 0;
-		        v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
-			printk("done\n");
-		}
+        smp_wmb();
+        rcu_unlock_domain(d);
+        break;
+    default:
+        rc = -EINVAL;
+        break;
+    }
 
-		printk("return %d\n", ptst->num_vcpus);
+    spin_unlock(&lock);
 
-		smp_wmb();
-		rcu_unlock_domain(d);
-		break;
-	default:
-		rc = -EINVAL;
-		break;
-	}
-
-	spin_unlock(&lock);
-
-	return rc;
+    return rc;
 }
 
 /**

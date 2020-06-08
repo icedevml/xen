@@ -47,6 +47,7 @@
 #include <xen/tmem.h>
 #include <xen/kexec.h>
 #include <xen/platform.h>
+#include <xen/trace.h>
 
 #include "xentoollog.h"
 
@@ -1586,7 +1587,16 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, xc_cpumap_t mask);
 
 int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask);
 
-int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, void **mapped_buf, uint32_t **offsets);
+struct xc_ptbuf_alloc_res {
+    uint32_t num_vcpus;
+    void **pt_buf;
+    struct pt_vcpu_state **state;
+};
+
+typedef struct xc_ptbuf_alloc_res xc_ptbuf_alloc_res_t;
+
+int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out);
+int xc_ptbuf_dealloc(xc_interface *xch, uint32_t domid);
 
 int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
 int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);

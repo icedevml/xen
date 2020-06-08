@@ -83,6 +83,7 @@ struct xen_sysctl_tbuf_op {
 struct xen_sysctl_ptbuf_op {
     /* IN variables */
 #define XEN_SYSCTL_PTBUFOP_alloc       0
+#define XEN_SYSCTL_PTBUFOP_dealloc     1
     domid_t domain;
     uint32_t cmd;
     uint32_t order;
@@ -1176,7 +1177,7 @@ struct xen_sysctl {
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_sysctl_cpu_policy        cpu_policy;
 #endif
-	struct xen_sysctl_ptbuf_op          ptbuf_op;
+        struct xen_sysctl_ptbuf_op          ptbuf_op;
         uint8_t                             pad[128];
     } u;
 };

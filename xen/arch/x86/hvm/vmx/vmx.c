@@ -4453,8 +4453,6 @@ static void lbr_fixup(void)
         bdf93_fixup();
 }
 
-int superwtf = 0;
-
 /* Returns false if the vmentry has to be restarted */
 bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
 {
