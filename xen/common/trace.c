@@ -382,7 +382,7 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
         d = rcu_lock_domain_by_any_id(ptbop->domain);
 
         // TODO what if size of ptst exceeds 4 kB?
-        ptst = (struct pt_state *)alloc_xenheap_pages(0, 0);
+        ptst = (struct pt_state *)page_to_virt(alloc_domheap_page(d, 0));
         memset(ptst, 0, PAGE_SIZE);
         share_xen_page_with_privileged_guests(virt_to_page(ptst), SHARE_ro);
         ptbop->mfn = virt_to_mfn(ptst);
@@ -392,7 +392,7 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
 
         for_each_vcpu ( d, v )
         {
-            ipt_buf = alloc_xenheap_pages(ptbop->order, 0);
+            ipt_buf = page_to_virt(alloc_domheap_pages(d, ptbop->order, 0));
 
             if (!ipt_buf) {
                 // TODO dealloc
