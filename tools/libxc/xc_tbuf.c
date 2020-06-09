@@ -72,7 +72,7 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
     if ( t_info == NULL || t_info->tbuf_size == 0 )
         rc = -1;
     else
-    *size = t_info->tbuf_size;
+	*size = t_info->tbuf_size;
 
     xenforeignmemory_unmap(xch->fmem, t_info, sysctl.u.tbuf_op.size);
 
@@ -108,7 +108,7 @@ int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, xc_pt
         {
             printf("IPT buffer vCPU: %d MFN: %llx\n", i, (unsigned long long)ptst->vcpu[i].buf_mfn);
             out->pt_buf[i] = NULL;
-	    out->state[i] = NULL;
+            out->state[i] = NULL;
 
             if (ptst->vcpu[i].buf_mfn) {
                 buf = xc_map_foreign_range(xch, DOMID_XEN, ptst->vcpu[i].size, PROT_READ, ptst->vcpu[i].buf_mfn);
