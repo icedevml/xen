@@ -425,6 +425,10 @@ int ptbuf_control(struct xen_sysctl_ptbuf_op *ptbop)
         smp_wmb();
         rcu_unlock_domain(d);
         break;
+    case XEN_SYSCTL_PTBUFOP_dealloc:
+        rc = -EINVAL;
+	// TODO not implemented yet
+        break;
     default:
         rc = -EINVAL;
         break;
