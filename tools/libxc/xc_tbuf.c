@@ -104,6 +104,7 @@ int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_p
     {
         printf("MFN: %llx\n", (unsigned long long)arg->mfn);
         mfn = arg->mfn;
+	// TODO bug - size not always PAGE_SIZE
         ptst = (struct pt_state *)xc_map_foreign_range(xch, DOMID_XEN, PAGE_SIZE, PROT_READ, mfn);
 
         out->num_vcpus = ptst->num_vcpus;
@@ -117,7 +118,7 @@ int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_p
             out->state[i] = NULL;
 
             if (ptst->vcpu[i].buf_mfn) {
-                buf = xc_map_foreign_range(xch, DOMID_XEN, ptst->vcpu[i].size, PROT_READ, ptst->vcpu[i].buf_mfn);
+                buf = xc_map_foreign_range(xch, DOMID_XEN, (1 << ptst->vcpu[i].order) << PAGE_SHIFT, PROT_READ, ptst->vcpu[i].buf_mfn);
                 printf("Mapped buffer: %llx\n", (unsigned long long)buf);
                 out->pt_buf[i] = buf;
                 out->state[i] = &ptst->vcpu[i];
@@ -128,10 +129,11 @@ int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_p
     return rc;
 }
 
-int xc_ptbuf_disable(xc_interface *xch, uint32_t domid)
+int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, xc_ptbuf_alloc_res_t *out)
 {
     DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
     int rc = -1;
+    int i;
 
     arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
     if ( arg == NULL )
@@ -143,6 +145,10 @@ int xc_ptbuf_disable(xc_interface *xch, uint32_t domid)
 
     rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
                   HYPERCALL_BUFFER_AS_ARG(arg));
+
+    for (i = 0; i < out->num_vcpus; i++) {
+        munmap(out->pt_buf[i], (1 << out->state[i]->order) << PAGE_SHIFT);
+    }
 
     return rc;
 }
