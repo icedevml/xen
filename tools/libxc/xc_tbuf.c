@@ -79,7 +79,7 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
     return rc;
 }
 
-int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out)
+int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out)
 {
     DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
     int rc = -1;
@@ -124,6 +124,25 @@ int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, xc_pt
             }
         }
     }
+
+    return rc;
+}
+
+int xc_ptbuf_disable(xc_interface *xch, uint32_t domid)
+{
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
+    int rc = -1;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->version = HVMOP_IPT_INTERFACE_VERSION;
+    arg->cmd = HVMOP_ipt_disable;
+    arg->domain = domid;
+
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
 
     return rc;
 }
