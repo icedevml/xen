@@ -409,6 +409,7 @@ static int vmx_domain_initialise(struct domain *d)
      * to reboot the system, so doesn't need mitigating against DoS's.
      */
     d->arch.hvm.vmx.exec_sp = is_hardware_domain(d) || opt_ept_exec_sp;
+    d->arch.hvm.vmx.pub_ipt_state = NULL;
 
     if ( !has_vlapic(d) )
         return 0;
