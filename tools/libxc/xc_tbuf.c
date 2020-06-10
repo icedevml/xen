@@ -81,23 +81,29 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
 
 int xc_ptbuf_alloc(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out)
 {
-    DECLARE_SYSCTL;
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
     int rc = -1;
     unsigned long mfn;
     struct pt_state *ptst;
     void *buf;
     int i;
 
-    sysctl.cmd = XEN_SYSCTL_ptbuf_op;
-    sysctl.interface_version = XEN_SYSCTL_INTERFACE_VERSION;
-    sysctl.u.ptbuf_op.cmd  = XEN_SYSCTL_PTBUFOP_alloc;
-    sysctl.u.ptbuf_op.domain = domid;
-    sysctl.u.ptbuf_op.order = order;
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
 
-    rc = xc_sysctl(xch, &sysctl);
+    arg->version = HVMOP_IPT_INTERFACE_VERSION;
+    arg->cmd = HVMOP_ipt_enable;
+    arg->domain = domid;
+    arg->order = order;
+
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+
     if ( rc == 0 )
     {
-        mfn = sysctl.u.ptbuf_op.mfn;
+        printf("MFN: %llx\n", (unsigned long long)arg->mfn);
+        mfn = arg->mfn;
         ptst = (struct pt_state *)xc_map_foreign_range(xch, DOMID_XEN, PAGE_SIZE, PROT_READ, mfn);
 
         out->num_vcpus = ptst->num_vcpus;

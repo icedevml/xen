@@ -353,6 +353,27 @@ struct xen_hvm_altp2m_op {
 typedef struct xen_hvm_altp2m_op xen_hvm_altp2m_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_hvm_altp2m_op_t);
 
+/* HVMOP_ipt: Perform Intel Processor Trace operation */
+#define HVMOP_ipt 26
+
+#define HVMOP_IPT_INTERFACE_VERSION 0x00000001
+
+struct xen_hvm_ipt_op {
+    /* IN variable */
+    uint32_t version;   /* HVMOP_IPT_INTERFACE_VERSION */
+    uint32_t cmd;
+/* Enable/disable external Intel Processor Trace for given domain */
+#define HVMOP_ipt_enable      1
+#define HVMOP_ipt_disable     2
+    domid_t domain;
+    uint32_t order;
+
+    /* OUT variable */
+    uint64_t mfn;
+};
+typedef struct xen_hvm_ipt_op xen_hvm_ipt_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_hvm_ipt_op_t);
+
 #endif /* __XEN_PUBLIC_HVM_HVM_OP_H__ */
 
 /*
