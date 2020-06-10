@@ -4901,9 +4901,8 @@ static int do_ipt_op(
     uint32_t buffer_size;
     int required_pages;
 
-
-//    if ( !hvm_ipt_supported() )
-//        return -EOPNOTSUPP;
+    if ( !hvm_ipt_supported() )
+        return -EOPNOTSUPP;
 
     if ( copy_from_guest(&a, arg, 1) )
         return -EFAULT;
