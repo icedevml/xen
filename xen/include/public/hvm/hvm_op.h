@@ -386,19 +386,19 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_ipt_op_t);
 /*
  * Per-vCPU state of IPT. Contains the information about MFN on which IPT
  * output buffer is allocated, the current offset (how many bytes in the buffer
- * are valid) and the output buffer size (in bytes).
+ * are valid) and the output buffer order
  */
 struct pt_vcpu_state {
     uint32_t buf_mfn; /* Start MFN of the IPT buffer for this vCPU */
     uint32_t offset; /* How many bytes were succesfully written to the IPT buffer */
-    uint32_t size; /* Size of the IPT buffer (in bytes) */
+    uint32_t order; /* Order of the IPT buffer */
 };
 
 /*
  * Global state of IPT for given domain.
  */
 struct pt_state {
-    uint32_t num_pages; /* Number of pages this structure is occupying */
+    uint32_t order; /* Order of the underlying buffer of this structure */
     uint32_t num_vcpus; /* Number of vCPUS for which IPT was enabled */
     struct pt_vcpu_state vcpu[]; /* Array of per-vCPU structures, max index: num_vcpus-1 */
 };

@@ -1595,7 +1595,7 @@ struct xc_ptbuf_alloc_res {
 typedef struct xc_ptbuf_alloc_res xc_ptbuf_alloc_res_t;
 
 int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out);
-int xc_ptbuf_disable(xc_interface *xch, uint32_t domid);
+int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, xc_ptbuf_alloc_res_t *out);
 
 int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
 int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);
