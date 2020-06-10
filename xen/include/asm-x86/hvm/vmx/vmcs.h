@@ -20,7 +20,6 @@
 
 #include <asm/hvm/io.h>
 #include <irq_vectors.h>
-#include <public/trace.h>
 
 extern void vmcs_dump_vcpu(struct vcpu *v);
 extern void setup_vmcs_dump(void);

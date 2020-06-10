@@ -47,7 +47,6 @@
 #include <xen/tmem.h>
 #include <xen/kexec.h>
 #include <xen/platform.h>
-#include <xen/trace.h>
 
 #include "xentoollog.h"
 

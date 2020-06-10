@@ -32,7 +32,6 @@
 #include <xen/cpu.h>
 #include <asm/atomic.h>
 #include <public/sysctl.h>
-#include <public/trace.h>
 
 #ifdef CONFIG_COMPAT
 #include <compat/trace.h>
