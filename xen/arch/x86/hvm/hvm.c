@@ -4897,8 +4897,9 @@ static int do_ipt_op(
     void* ipt_buf;
     int i;
     struct vcpu *v;
-    struct pt_state* ptst;
+    struct pt_state* ptst = NULL;
     uint32_t buffer_size;
+    int required_pages;
 
 
 //    if ( !hvm_ipt_supported() )
@@ -4934,13 +4935,24 @@ static int do_ipt_op(
 
     if (a.cmd == HVMOP_ipt_enable)
     {
-        // TODO what if size of ptst exceeds 4 kB?
-        ptst = (struct pt_state *)page_to_virt(alloc_domheap_page(d, 0));
-        memset(ptst, 0, PAGE_SIZE);
-        share_xen_page_with_privileged_guests(virt_to_page(ptst), SHARE_ro);
+        if (d->arch.hvm.vmx.pub_ipt_state) {
+            // already enabled
+            rc = -EINVAL;
+            goto out;
+	}
+
+        required_pages = PFN_UP(sizeof(struct pt_state) + (sizeof(struct pt_vcpu_state) * d->max_vcpus));
+        ptst = (struct pt_state *)page_to_virt(alloc_domheap_pages(d, required_pages, 0));
+        memset(ptst, 0, required_pages * PAGE_SIZE);
+
+	for (i = 0; i < required_pages; i++)
+            share_xen_page_with_privileged_guests(virt_to_page(ptst) + i, SHARE_ro);
+
         a.mfn = virt_to_mfn(ptst);
 
-        ptst->num_vcpus = 0;
+	ptst->num_pages = required_pages;
+        ptst->num_vcpus = d->max_vcpus;
+
         buffer_size = (1 << a.order) << PAGE_SHIFT;
 
         for_each_vcpu ( d, v )
@@ -4948,14 +4960,14 @@ static int do_ipt_op(
             ipt_buf = page_to_virt(alloc_domheap_pages(d, a.order, 0));
 
             if (!ipt_buf) {
-                // TODO dealloc
-                rc = -EINVAL;
+                rc = -EFAULT;
                 goto out;
             }
 
-            if (ptst->num_vcpus < v->vcpu_id) {
-                ptst->num_vcpus = v->vcpu_id + 1;
-            }
+	    if (v->vcpu_id >= ptst->num_vcpus) {
+                rc = -EFAULT;
+		goto out;
+	    }
 
             buffer_size = (1 << a.order) << PAGE_SHIFT;
             memset(ipt_buf, 0, buffer_size);
@@ -4974,6 +4986,25 @@ static int do_ipt_op(
             v->arch.hvm.vmx.ipt_state.status = 0;
             v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
         }
+
+	d->arch.hvm.vmx.pub_ipt_state = ptst;
+    } else if (a.cmd == HVMOP_ipt_disable) {
+	ptst = d->arch.hvm.vmx.pub_ipt_state;
+
+	if (!ptst) {
+            rc = -EINVAL;
+	    goto out;
+	}
+
+	for_each_vcpu( d, v ) {
+            if (ptst->vcpu[v->vcpu_id].buf_mfn) {
+		v->arch.hvm.vmx.ipt_state.ctl = 0;
+                free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].size >> PAGE_SHIFT);
+	    }
+	}
+
+	d->arch.hvm.vmx.pub_ipt_state = NULL;
+	free_domheap_pages(virt_to_page(ptst), ptst->num_pages);
     }
 
     rc = -EFAULT;
@@ -4982,6 +5013,19 @@ static int do_ipt_op(
     rc = 0;
 
  out:
+    if (a.cmd == HVMOP_ipt_enable && rc) {
+        // operation failed in the middle
+	// deallocate everytihng
+	for_each_vcpu( d, v ) {
+            if (ptst->vcpu[v->vcpu_id].buf_mfn) {
+		v->arch.hvm.vmx.ipt_state.ctl = 0;
+                free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].size >> PAGE_SHIFT);
+	    }
+	}
+
+	free_domheap_pages(virt_to_page(ptst), ptst->num_pages);
+    }
+
     smp_wmb();
     rcu_unlock_domain(d);
 

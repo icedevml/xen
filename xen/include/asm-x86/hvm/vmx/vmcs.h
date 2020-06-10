@@ -70,6 +70,11 @@ struct vmx_domain {
      * around CVE-2018-12207 as appropriate.
      */
     bool exec_sp;
+
+    /*
+     * Used by HVMOP_IPT_*
+     */
+    void *pub_ipt_state;
 };
 
 /*

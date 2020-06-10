@@ -344,6 +344,7 @@ struct pt_vcpu_state {
  * Global state of IPT for given domain.
  */
 struct pt_state {
+    uint32_t num_pages; /* Number of pages this structure is occupying */
     uint32_t num_vcpus; /* Number of vCPUS for which IPT was enabled */
     struct pt_vcpu_state vcpu[]; /* Array of per-vCPU structures, max index: num_vcpus-1 */
 };
