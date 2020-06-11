@@ -4960,6 +4960,7 @@ static int do_ipt_op(
     }
 
     d = rcu_lock_domain_by_any_id(a.domain);
+    domain_pause(d);
 
     if ( d == NULL )
         return -ESRCH;
@@ -5070,6 +5071,7 @@ static int do_ipt_op(
     }
 
     smp_wmb();
+    domain_unpause(d);
     rcu_unlock_domain(d);
 
     return rc;
