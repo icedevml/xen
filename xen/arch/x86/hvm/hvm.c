@@ -4980,7 +4980,7 @@ static int do_ipt_op(
         }
 
         buf_order = get_order_from_pages(PFN_UP(sizeof(struct pt_state) + (sizeof(struct pt_vcpu_state) * d->max_vcpus)));
-        ptst = (struct pt_state *)page_to_virt(alloc_domheap_pages(d, buf_order, 0));
+        ptst = (struct pt_state *)page_to_virt(alloc_domheap_pages(d, buf_order, MEMF_no_owner));
         printk("allocated %llx %llx\n", (unsigned long long)virt_to_mfn(ptst), (unsigned long long)buf_order);
         memset(ptst, 0, (1 << buf_order) << PAGE_SHIFT);
 
@@ -4994,7 +4994,7 @@ static int do_ipt_op(
 
         for_each_vcpu ( d, v )
         {
-            ipt_buf = page_to_virt(alloc_domheap_pages(d, a.order, 0));
+            ipt_buf = page_to_virt(alloc_domheap_pages(d, a.order, MEMF_no_owner));
             printk("alloc %llx %llx\n", (unsigned long long)virt_to_mfn(ipt_buf), (unsigned long long)a.order);
 
             if (!ipt_buf) {
@@ -5040,13 +5040,13 @@ static int do_ipt_op(
             if (ptst->vcpu[v->vcpu_id].buf_mfn) {
                 v->arch.hvm.vmx.ipt_state.ctl = 0;
                 printk("free domheap %llx %llx\n", (unsigned long long)ptst->vcpu[v->vcpu_id].buf_mfn, (unsigned long long)(ptst->vcpu[v->vcpu_id].order));
-                free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].order);
+                // FIXME free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].order);
             }
         }
 
         d->arch.hvm.vmx.pub_ipt_state = NULL;
         printk("free main %llx %llx\n", (unsigned long long)virt_to_mfn(ptst), (unsigned long long)ptst->order);
-        free_domheap_pages(virt_to_page(ptst), ptst->order);
+        // FIXME free_domheap_pages(virt_to_page(ptst), ptst->order);
         printk("done\n");
     }
 
@@ -5062,11 +5062,11 @@ static int do_ipt_op(
         for_each_vcpu( d, v ) {
             if (ptst->vcpu[v->vcpu_id].buf_mfn) {
                 v->arch.hvm.vmx.ipt_state.ctl = 0;
-                free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].order);
+                // FIXME free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].order);
             }
         }
 
-        free_domheap_pages(virt_to_page(ptst), ptst->order);
+        // FIXME free_domheap_pages(virt_to_page(ptst), ptst->order);
     }
 
     smp_wmb();
