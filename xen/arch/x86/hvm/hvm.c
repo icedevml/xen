@@ -5024,7 +5024,7 @@ static int do_ipt_op(
             v->arch.hvm.vmx.ipt_state.output_base = virt_to_mfn(ipt_buf) << PAGE_SHIFT;
             v->arch.hvm.vmx.ipt_state.output_mask = buffer_size - 1;
             v->arch.hvm.vmx.ipt_state.status = 0;
-            v->arch.hvm.vmx.ipt_state.ctl = 0; // RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
+            v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
         }
 
         d->arch.hvm.vmx.pub_ipt_state = ptst;
@@ -5044,24 +5044,17 @@ static int do_ipt_op(
                 printk("free domheap %llx %llx\n", (unsigned long long)ptst->vcpu[v->vcpu_id].buf_mfn, (unsigned long long)(ptst->vcpu[v->vcpu_id].order));
 
                 for (i = 0; i < (1 << ptst->vcpu[v->vcpu_id].order); i++)
-		{
-                    page = mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn + i);
-                    put_page_alloc_ref(page);
-                    if ( !test_and_clear_bit(_PGC_xen_heap, &page->count_info) )
-                        ASSERT_UNREACHABLE();
-                    page->u.inuse.type_info = 0;
-                    page_set_owner(page, NULL);
-		}
-
-		free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].order);
+                {
+                    from_shared_domheap_page(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn));
+                }
             }
         }
 
         d->arch.hvm.vmx.pub_ipt_state = NULL;
         printk("free main %llx %llx\n", (unsigned long long)virt_to_mfn(ptst), (unsigned long long)ptst->order);
 
-//        for (i = 0; i < (1 << ptst->order); i++)
-//            free_shared_domheap_page(virt_to_page(ptst) + i);
+        for (i = 0; i < (1 << ptst->order); i++)
+            free_shared_domheap_page(virt_to_page(ptst) + i);
 
         printk("done\n");
     }
