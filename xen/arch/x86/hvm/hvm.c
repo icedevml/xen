@@ -4939,7 +4939,6 @@ static int do_ipt_op(
     struct pt_state* ptst = NULL;
     uint32_t buffer_size;
     uint32_t buf_order;
-    struct page_info *page;
 
     if ( !hvm_ipt_supported() )
         return -EOPNOTSUPP;
@@ -5045,7 +5044,7 @@ static int do_ipt_op(
 
                 for (i = 0; i < (1 << ptst->vcpu[v->vcpu_id].order); i++)
                 {
-                    from_shared_domheap_page(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn));
+                    free_shared_domheap_page(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn));
                 }
             }
         }
