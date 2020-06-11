@@ -5044,7 +5044,7 @@ static int do_ipt_op(
 
                 for (i = 0; i < (1 << ptst->vcpu[v->vcpu_id].order); i++)
                 {
-                    free_shared_domheap_page(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn));
+                    free_shared_domheap_page(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn) + i);
                 }
             }
         }
