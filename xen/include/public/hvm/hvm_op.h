@@ -389,7 +389,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_hvm_ipt_op_t);
  * are valid) and the output buffer order
  */
 struct pt_vcpu_state {
-    uint32_t buf_mfn; /* Start MFN of the IPT buffer for this vCPU */
+    uint64_t buf_mfn; /* Start MFN of the IPT buffer for this vCPU */
     uint32_t offset; /* How many bytes were succesfully written to the IPT buffer */
     uint32_t order; /* Order of the IPT buffer */
 };

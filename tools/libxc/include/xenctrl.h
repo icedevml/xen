@@ -1588,6 +1588,7 @@ int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask);
 
 struct xc_ptbuf_alloc_res {
     uint32_t num_vcpus;
+    void *orig_ptst;
     void **pt_buf;
     struct pt_vcpu_state **state;
 };

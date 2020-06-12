@@ -108,6 +108,7 @@ int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_p
         ptst = (struct pt_state *)xc_map_foreign_range(xch, DOMID_XEN, PAGE_SIZE, PROT_READ, mfn);
 
         out->num_vcpus = ptst->num_vcpus;
+        out->orig_ptst = ptst;
         out->pt_buf = (void **)malloc(ptst->num_vcpus * sizeof(void *));
         out->state = (struct pt_vcpu_state **)malloc(ptst->num_vcpus * sizeof(struct pt_vcpu_state *));
 
@@ -119,7 +120,7 @@ int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_p
 
             if (ptst->vcpu[i].buf_mfn) {
                 buf = xc_map_foreign_range(xch, DOMID_XEN, (1 << ptst->vcpu[i].order) << PAGE_SHIFT, PROT_READ, ptst->vcpu[i].buf_mfn);
-                printf("Mapped buffer: %llx\n", (unsigned long long)buf);
+                printf("Mapped buffer\n");
                 out->pt_buf[i] = buf;
                 out->state[i] = &ptst->vcpu[i];
             }
@@ -139,16 +140,23 @@ int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, xc_ptbuf_alloc_res_t *ou
     if ( arg == NULL )
         return -1;
 
+    // FIXME this must be done before ipt_disable
+    // hypervisor should somehow check if memory was properly unmapped
+    // otherwise it will crash
+    for (i = 0; i < out->num_vcpus; i++) {
+        printf("unmapi %llx %llx\n", (unsigned long long)(intptr_t)out->pt_buf[i], (unsigned long long)((1 << out->state[i]->order) << PAGE_SHIFT));
+        munmap(out->pt_buf[i], (1 << out->state[i]->order) << PAGE_SHIFT);
+    }
+
+    printf("unmap %llx\n", (unsigned long long)(intptr_t)out->orig_ptst);
+    munmap(out->orig_ptst, PAGE_SIZE);
+
     arg->version = HVMOP_IPT_INTERFACE_VERSION;
     arg->cmd = HVMOP_ipt_disable;
     arg->domain = domid;
 
     rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
                   HYPERCALL_BUFFER_AS_ARG(arg));
-
-    for (i = 0; i < out->num_vcpus; i++) {
-        munmap(out->pt_buf[i], (1 << out->state[i]->order) << PAGE_SHIFT);
-    }
 
     return rc;
 }

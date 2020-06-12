@@ -5044,7 +5044,7 @@ static int do_ipt_op(
 
                 for (i = 0; i < (1 << ptst->vcpu[v->vcpu_id].order); i++)
                 {
-                    free_shared_domheap_page(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn) + i);
+                    free_shared_domheap_page(mfn_to_page(_mfn(ptst->vcpu[v->vcpu_id].buf_mfn + i)));
                 }
             }
         }
@@ -5070,11 +5070,11 @@ static int do_ipt_op(
         for_each_vcpu( d, v ) {
             if (ptst->vcpu[v->vcpu_id].buf_mfn) {
                 v->arch.hvm.vmx.ipt_state.ctl = 0;
-                free_domheap_pages(mfn_to_page(ptst->vcpu[v->vcpu_id].buf_mfn), ptst->vcpu[v->vcpu_id].order);
+                free_shared_domheap_pages(mfn_to_page(_mfn(ptst->vcpu[v->vcpu_id].buf_mfn)), ptst->vcpu[v->vcpu_id].order);
             }
         }
 
-        free_domheap_pages(virt_to_page(ptst), ptst->order);
+        free_shared_domheap_pages(virt_to_page(ptst), ptst->order);
     }
 
     smp_wmb();
