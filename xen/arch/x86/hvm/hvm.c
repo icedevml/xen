@@ -4940,8 +4940,8 @@ static int do_ipt_op(
     uint32_t buf_order;
     uint64_t buf_mfn;
 
-    //if ( !hvm_ipt_supported() )
-    //    return -EOPNOTSUPP;
+    if ( !hvm_ipt_supported() )
+        return -EOPNOTSUPP;
 
     if ( copy_from_guest(&a, arg, 1) )
         return -EFAULT;
