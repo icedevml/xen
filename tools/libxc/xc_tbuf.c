@@ -160,6 +160,7 @@ int xc_ptbuf_map(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint8_t **buf
 
 int xc_ptbuf_unmap(xc_interface *xch, uint8_t *buf, uint64_t size)
 {
+    printf("actual unmap %llx %llx\n", (unsigned long long)buf, (unsigned long long)size);
     munmap(buf, size);
     //xenforeignmemory_unmap(xch->fmem, buf, size >> PAGE_SHIFT);
     return 0;

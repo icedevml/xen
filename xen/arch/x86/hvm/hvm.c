@@ -4943,8 +4943,6 @@ static int do_ipt_op(
     //if ( !hvm_ipt_supported() )
     //    return -EOPNOTSUPP;
 
-    printk("entered ipt_op\n");
-
     if ( copy_from_guest(&a, arg, 1) )
         return -EFAULT;
 
@@ -4985,8 +4983,6 @@ static int do_ipt_op(
 
     if (a.cmd == HVMOP_ipt_enable)
     {
-        printk("enable\n");
-
         if (v->arch.hvm.vmx.ipt_state.enabled) {
             // already enabled
             rc = -EINVAL;
@@ -4995,15 +4991,12 @@ static int do_ipt_op(
 
         buf_order = get_order_from_bytes(a.size);
 
-	printk("size\n");
 	if ((a.size >> PAGE_SHIFT) != (1 << buf_order) || a.size < PAGE_SIZE || a.size > 1000000 * PAGE_SIZE) {
             // order must be a power of 2
 	    // range from 4 kB to 4 GB
             rc = -EINVAL;
 	    goto out;
 	}
-
-	printk("post\n");
 
         buf = page_to_virt(alloc_domheap_pages(d, buf_order, MEMF_no_owner));
 	buf_size = a.size;
@@ -5037,14 +5030,10 @@ static int do_ipt_op(
 
         for (i = 0; i < (buf_size >> PAGE_SHIFT); i++)
         {
-            if ((mfn_to_page(_mfn(buf_mfn + i))->count_info & PGC_count_mask) != 0)
+            if ((mfn_to_page(_mfn(buf_mfn + i))->count_info & PGC_count_mask) != 1)
 	    {
-                put_page_alloc_ref(mfn_to_page(_mfn(buf_mfn + i)));
-                // page was not unmapped from Dom0
-		if (i == 0)
-                printk("busy %llx\n", (unsigned long long)(mfn_to_page(_mfn(buf_mfn + i))->count_info & PGC_count_mask));
-                //rc = -EBUSY;
-		//goto out;
+                rc = -EBUSY;
+		goto out;
 	    }
         }
 
@@ -5053,7 +5042,6 @@ static int do_ipt_op(
 
         for (i = 0; i < (buf_size >> PAGE_SHIFT); i++)
         {
-            printk("free page %llx\n", (unsigned long long)(buf_mfn + i));
             free_shared_domheap_page(mfn_to_page(_mfn(buf_mfn + i)));
         }
     }
