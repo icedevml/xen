@@ -93,7 +93,6 @@ int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t s
     arg->vcpu = vcpu;
     arg->size = size;
 
-    printf("making xencall\n");
     return xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
                   HYPERCALL_BUFFER_AS_ARG(arg));
 }
@@ -141,11 +140,8 @@ int xc_ptbuf_map(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint8_t **buf
     rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
                   HYPERCALL_BUFFER_AS_ARG(arg));
 
-    printf("xc_ptbuf_map rc=%d\n", rc);
-
     if ( rc == 0 )
     {
-        printf("xc_ptbuf_map mfn=%llx size=%llx\n", (unsigned long long)arg->mfn, (unsigned long long)arg->size);
         mapped_buf = (uint8_t *)xc_map_foreign_range(xch, DOMID_XEN, arg->size, PROT_READ, arg->mfn);
 
         if ( mapped_buf == NULL )
