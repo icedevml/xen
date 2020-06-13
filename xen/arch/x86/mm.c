@@ -782,10 +782,6 @@ bool is_iomem_page(mfn_t mfn)
     /* Caller must know that it is an iomem page, or a reference is held. */
     page = mfn_to_page(mfn);
 
-    if ((page->count_info & PGC_count_mask) != 0) {
-        printk("is_iomem_page: %llx, pgc=%llx\n", (unsigned long long)mfn_x(mfn), (unsigned long long)(page->count_info & PGC_count_mask));
-    }
-
     ASSERT((page->count_info & PGC_count_mask) != 0);
 
     return (page_get_owner(page) == dom_io);
