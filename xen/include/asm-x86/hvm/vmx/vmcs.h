@@ -69,11 +69,6 @@ struct vmx_domain {
      * around CVE-2018-12207 as appropriate.
      */
     bool exec_sp;
-
-    /*
-     * Used by HVMOP_IPT_*
-     */
-    void *pub_ipt_state;
 };
 
 /*
@@ -112,11 +107,11 @@ struct pi_blocking_vcpu {
 };
 
 struct ipt_state {
+    uint32_t enabled;
     uint64_t ctl;
     uint64_t status;
     uint64_t output_base;
     uint64_t output_mask;
-    struct pt_vcpu_state *public_state;
 };
 
 struct vmx_vcpu {

@@ -79,14 +79,9 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
     return rc;
 }
 
-int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out)
+int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t size)
 {
     DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
-    int rc = -1;
-    unsigned long mfn;
-    struct pt_state *ptst;
-    void *buf;
-    int i;
 
     arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
     if ( arg == NULL )
@@ -95,70 +90,96 @@ int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_p
     arg->version = HVMOP_IPT_INTERFACE_VERSION;
     arg->cmd = HVMOP_ipt_enable;
     arg->domain = domid;
-    arg->order = order;
+    arg->vcpu = vcpu;
+    arg->size = size;
+
+    printf("making xencall\n");
+    return xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+}
+
+int xc_ptbuf_get_offset(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t *offset)
+{
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
+    int rc = -1;
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->version = HVMOP_IPT_INTERFACE_VERSION;
+    arg->cmd = HVMOP_ipt_get_offset;
+    arg->domain = domid;
+    arg->vcpu = vcpu;
 
     rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
                   HYPERCALL_BUFFER_AS_ARG(arg));
 
     if ( rc == 0 )
     {
-        printf("MFN: %llx\n", (unsigned long long)arg->mfn);
-        mfn = arg->mfn;
-	// TODO bug - size not always PAGE_SIZE
-        ptst = (struct pt_state *)xc_map_foreign_range(xch, DOMID_XEN, PAGE_SIZE, PROT_READ, mfn);
-
-        out->num_vcpus = ptst->num_vcpus;
-        out->orig_ptst = ptst;
-        out->pt_buf = (void **)malloc(ptst->num_vcpus * sizeof(void *));
-        out->state = (struct pt_vcpu_state **)malloc(ptst->num_vcpus * sizeof(struct pt_vcpu_state *));
-
-        for (i = 0; i < ptst->num_vcpus; i++)
-        {
-            printf("IPT buffer vCPU: %d MFN: %llx\n", i, (unsigned long long)ptst->vcpu[i].buf_mfn);
-            out->pt_buf[i] = NULL;
-            out->state[i] = NULL;
-
-            if (ptst->vcpu[i].buf_mfn) {
-                buf = xc_map_foreign_range(xch, DOMID_XEN, (1 << ptst->vcpu[i].order) << PAGE_SHIFT, PROT_READ, ptst->vcpu[i].buf_mfn);
-                printf("Mapped buffer\n");
-                out->pt_buf[i] = buf;
-                out->state[i] = &ptst->vcpu[i];
-            }
-        }
+        *offset = arg->offset;
     }
 
     return rc;
 }
 
-int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, xc_ptbuf_alloc_res_t *out)
+int xc_ptbuf_map(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint8_t **buf, uint64_t *size)
 {
     DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
     int rc = -1;
-    int i;
+    uint8_t *mapped_buf;
 
     arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
     if ( arg == NULL )
         return -1;
 
-    // FIXME this must be done before ipt_disable
-    // hypervisor should somehow check if memory was properly unmapped
-    // otherwise it will crash
-    for (i = 0; i < out->num_vcpus; i++) {
-        printf("unmapi %llx %llx\n", (unsigned long long)(intptr_t)out->pt_buf[i], (unsigned long long)((1 << out->state[i]->order) << PAGE_SHIFT));
-        munmap(out->pt_buf[i], (1 << out->state[i]->order) << PAGE_SHIFT);
-    }
-
-    printf("unmap %llx\n", (unsigned long long)(intptr_t)out->orig_ptst);
-    munmap(out->orig_ptst, PAGE_SIZE);
-
     arg->version = HVMOP_IPT_INTERFACE_VERSION;
-    arg->cmd = HVMOP_ipt_disable;
+    arg->cmd = HVMOP_ipt_get_buf;
     arg->domain = domid;
+    arg->vcpu = vcpu;
 
     rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
                   HYPERCALL_BUFFER_AS_ARG(arg));
 
+    printf("xc_ptbuf_map rc=%d\n", rc);
+
+    if ( rc == 0 )
+    {
+        printf("xc_ptbuf_map mfn=%llx size=%llx\n", (unsigned long long)arg->mfn, (unsigned long long)arg->size);
+        mapped_buf = (uint8_t *)xc_map_foreign_range(xch, DOMID_XEN, arg->size, PROT_READ, arg->mfn);
+
+	if ( mapped_buf == NULL )
+            return -1;
+
+        *buf = mapped_buf;
+	*size = arg->size;
+    }
+
     return rc;
+}
+
+int xc_ptbuf_unmap(xc_interface *xch, uint8_t *buf, uint64_t size)
+{
+    munmap(buf, size);
+    //xenforeignmemory_unmap(xch->fmem, buf, size >> PAGE_SHIFT);
+    return 0;
+}
+
+int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, uint32_t vcpu)
+{
+    DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
+
+    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
+    if ( arg == NULL )
+        return -1;
+
+    arg->version = HVMOP_IPT_INTERFACE_VERSION;
+    arg->cmd = HVMOP_ipt_disable;
+    arg->domain = domid;
+    arg->vcpu = vcpu;
+
+    return xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
+                    HYPERCALL_BUFFER_AS_ARG(arg));
 }
 
 int xc_tbuf_enable(xc_interface *xch, unsigned long pages, unsigned long *mfn,

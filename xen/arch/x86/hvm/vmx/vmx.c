@@ -409,7 +409,6 @@ static int vmx_domain_initialise(struct domain *d)
      * to reboot the system, so doesn't need mitigating against DoS's.
      */
     d->arch.hvm.vmx.exec_sp = is_hardware_domain(d) || opt_ept_exec_sp;
-    d->arch.hvm.vmx.pub_ipt_state = NULL;
 
     if ( !has_vlapic(d) )
         return 0;
@@ -3656,16 +3655,14 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
-    wrmsrl(MSR_IA32_RTIT_CTL, 0);
+    // FIXME wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
     if (v->arch.hvm.vmx.ipt_state.ctl)
     {
         smp_rmb();
 
-        rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state.status);
-        rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state.output_mask);
-
-	v->arch.hvm.vmx.ipt_state.public_state->offset = (v->arch.hvm.vmx.ipt_state.output_mask >> 32);
+        // FIXME rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state.status);
+        // FIXME rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state.output_mask);
 
 	//printk("IPT EXIT (%d): %016llx mask: %016llx\n", v->vcpu_id,
         //    (unsigned long long)v->arch.hvm.vmx.ipt_state.status,
@@ -4469,17 +4466,17 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
-    wrmsrl(MSR_IA32_RTIT_CTL, 0);
+    // FIXME wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
-    if (curr->arch.hvm.vmx.ipt_state.ctl)
-    {
+    // if (curr->arch.hvm.vmx.ipt_state.ctl)
+    // {
         // printk("IPT ENTR (%d): %016llx ctl: %016llx mask: %016llx\n", curr->vcpu_id, (unsigned long long)curr->arch.hvm.vmx.ipt_state.status, (unsigned long long)curr->arch.hvm.vmx.ipt_state.ctl, (unsigned long long)curr->arch.hvm.vmx.ipt_state.output_mask);
 
-        wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
-        wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);
-        wrmsrl(MSR_IA32_RTIT_STATUS, curr->arch.hvm.vmx.ipt_state.status);
-        wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state.ctl);
-    }
+        // FIXME wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
+        // FIXME wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);
+        // FIXME wrmsrl(MSR_IA32_RTIT_STATUS, curr->arch.hvm.vmx.ipt_state.status);
+        // FIXME wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state.ctl);
+    // }
 
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();

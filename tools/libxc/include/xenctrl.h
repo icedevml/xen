@@ -1586,17 +1586,14 @@ int xc_tbuf_set_cpu_mask(xc_interface *xch, xc_cpumap_t mask);
 
 int xc_tbuf_set_evt_mask(xc_interface *xch, uint32_t mask);
 
-struct xc_ptbuf_alloc_res {
-    uint32_t num_vcpus;
-    void *orig_ptst;
-    void **pt_buf;
-    struct pt_vcpu_state **state;
-};
-
-typedef struct xc_ptbuf_alloc_res xc_ptbuf_alloc_res_t;
-
-int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, unsigned long order, xc_ptbuf_alloc_res_t *out);
-int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, xc_ptbuf_alloc_res_t *out);
+/**
+ * Intel Processor Trace
+ */
+int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t size);
+int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, uint32_t vcpu);
+int xc_ptbuf_map(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint8_t **buf, uint64_t *size);
+int xc_ptbuf_unmap(xc_interface *xch, uint8_t *buf, uint64_t size);
+int xc_ptbuf_get_offset(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t *offset);
 
 int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
 int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);
