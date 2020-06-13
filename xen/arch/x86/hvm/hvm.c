@@ -4976,7 +4976,7 @@ static int do_ipt_op(
     if (a.vcpu >= d->max_vcpus)
     {
         rc = -EINVAL;
-	goto out;
+        goto out;
     }
 
     v = d->vcpu[a.vcpu];
@@ -4991,15 +4991,15 @@ static int do_ipt_op(
 
         buf_order = get_order_from_bytes(a.size);
 
-	if ((a.size >> PAGE_SHIFT) != (1 << buf_order) || a.size < PAGE_SIZE || a.size > 1000000 * PAGE_SIZE) {
+        if ((a.size >> PAGE_SHIFT) != (1 << buf_order) || a.size < PAGE_SIZE || a.size > 1000000 * PAGE_SIZE) {
             // order must be a power of 2
-	    // range from 4 kB to 4 GB
+            // range from 4 kB to 4 GB
             rc = -EINVAL;
-	    goto out;
-	}
+            goto out;
+        }
 
         buf = page_to_virt(alloc_domheap_pages(d, buf_order, MEMF_no_owner));
-	buf_size = a.size;
+        buf_size = a.size;
 
         if (!buf) {
             rc = -EFAULT;
@@ -5012,7 +5012,7 @@ static int do_ipt_op(
             share_xen_page_with_privileged_guests(virt_to_page(buf) + i, SHARE_ro);
         }
 
-	v->arch.hvm.vmx.ipt_state.enabled = 1;
+        v->arch.hvm.vmx.ipt_state.enabled = 1;
         v->arch.hvm.vmx.ipt_state.output_base = virt_to_mfn(buf) << PAGE_SHIFT;
         v->arch.hvm.vmx.ipt_state.output_mask = buf_size - 1;
         v->arch.hvm.vmx.ipt_state.status = 0;
@@ -5025,19 +5025,19 @@ static int do_ipt_op(
             goto out;
         }
 
-	buf_mfn = v->arch.hvm.vmx.ipt_state.output_base >> PAGE_SHIFT;
-	buf_size = (v->arch.hvm.vmx.ipt_state.output_mask + 1) & 0xFFFFFFFFUL;
+        buf_mfn = v->arch.hvm.vmx.ipt_state.output_base >> PAGE_SHIFT;
+        buf_size = (v->arch.hvm.vmx.ipt_state.output_mask + 1) & 0xFFFFFFFFUL;
 
         for (i = 0; i < (buf_size >> PAGE_SHIFT); i++)
         {
             if ((mfn_to_page(_mfn(buf_mfn + i))->count_info & PGC_count_mask) != 1)
-	    {
+            {
                 rc = -EBUSY;
-		goto out;
-	    }
+                goto out;
+            }
         }
 
-	v->arch.hvm.vmx.ipt_state.enabled = 0;
+        v->arch.hvm.vmx.ipt_state.enabled = 0;
         v->arch.hvm.vmx.ipt_state.ctl = 0;
 
         for (i = 0; i < (buf_size >> PAGE_SHIFT); i++)
@@ -5049,7 +5049,7 @@ static int do_ipt_op(
     {
         if (!v->arch.hvm.vmx.ipt_state.enabled) {
             rc = -EINVAL;
-	    goto out;
+            goto out;
         }
 
         a.mfn = v->arch.hvm.vmx.ipt_state.output_base >> PAGE_SHIFT;
@@ -5062,7 +5062,7 @@ static int do_ipt_op(
             goto out;
         }
 
-	a.offset = v->arch.hvm.vmx.ipt_state.output_mask >> 32;
+        a.offset = v->arch.hvm.vmx.ipt_state.output_mask >> 32;
     }
 
     rc = -EFAULT;

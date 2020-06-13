@@ -3655,14 +3655,14 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
-    // FIXME wrmsrl(MSR_IA32_RTIT_CTL, 0);
+    wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
     if (v->arch.hvm.vmx.ipt_state.ctl)
     {
         smp_rmb();
 
-        // FIXME rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state.status);
-        // FIXME rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state.output_mask);
+        rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state.status);
+        rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state.output_mask);
 
 	//printk("IPT EXIT (%d): %016llx mask: %016llx\n", v->vcpu_id,
         //    (unsigned long long)v->arch.hvm.vmx.ipt_state.status,
@@ -4466,17 +4466,17 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
-    // FIXME wrmsrl(MSR_IA32_RTIT_CTL, 0);
+    wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
-    // if (curr->arch.hvm.vmx.ipt_state.ctl)
-    // {
+    if (curr->arch.hvm.vmx.ipt_state.ctl)
+    {
         // printk("IPT ENTR (%d): %016llx ctl: %016llx mask: %016llx\n", curr->vcpu_id, (unsigned long long)curr->arch.hvm.vmx.ipt_state.status, (unsigned long long)curr->arch.hvm.vmx.ipt_state.ctl, (unsigned long long)curr->arch.hvm.vmx.ipt_state.output_mask);
 
-        // FIXME wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
-        // FIXME wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);
-        // FIXME wrmsrl(MSR_IA32_RTIT_STATUS, curr->arch.hvm.vmx.ipt_state.status);
-        // FIXME wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state.ctl);
-    // }
+        wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
+        wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);
+        wrmsrl(MSR_IA32_RTIT_STATUS, curr->arch.hvm.vmx.ipt_state.status);
+        wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state.ctl);
+    }
 
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();

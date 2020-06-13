@@ -148,11 +148,11 @@ int xc_ptbuf_map(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint8_t **buf
         printf("xc_ptbuf_map mfn=%llx size=%llx\n", (unsigned long long)arg->mfn, (unsigned long long)arg->size);
         mapped_buf = (uint8_t *)xc_map_foreign_range(xch, DOMID_XEN, arg->size, PROT_READ, arg->mfn);
 
-	if ( mapped_buf == NULL )
+        if ( mapped_buf == NULL )
             return -1;
 
         *buf = mapped_buf;
-	*size = arg->size;
+        *size = arg->size;
     }
 
     return rc;
