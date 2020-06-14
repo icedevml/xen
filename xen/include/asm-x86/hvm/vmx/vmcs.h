@@ -107,7 +107,6 @@ struct pi_blocking_vcpu {
 };
 
 struct ipt_state {
-    uint32_t enabled;
     uint64_t ctl;
     uint64_t status;
     uint64_t output_base;
@@ -198,7 +197,7 @@ struct vmx_vcpu {
     struct pi_blocking_vcpu pi_blocking;
 
     /* State of Intel Processor Trace feature */
-    struct ipt_state     ipt_state;
+    struct ipt_state     *ipt_state;
 };
 
 int vmx_create_vmcs(struct vcpu *v);

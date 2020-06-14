@@ -470,7 +470,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     vmx_install_vlapic_mapping(v);
 
-    v->arch.hvm.vmx.ipt_state.ctl = 0;
+    v->arch.hvm.vmx.ipt_state = NULL;
 
     return 0;
 }
@@ -3655,14 +3655,13 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
 
-    wrmsrl(MSR_IA32_RTIT_CTL, 0);
-
-    if (v->arch.hvm.vmx.ipt_state.ctl)
+    if ( unlikely(v->arch.hvm.vmx.ipt_state) )
     {
+        wrmsrl(MSR_IA32_RTIT_CTL, 0);
         smp_rmb();
 
-        rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state.status);
-        rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state.output_mask);
+        rdmsrl(MSR_IA32_RTIT_STATUS, v->arch.hvm.vmx.ipt_state->status);
+        rdmsrl(MSR_IA32_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state->output_mask);
     }
 
     hvm_invalidate_regs_fields(regs);
@@ -4462,14 +4461,21 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
-    wrmsrl(MSR_IA32_RTIT_CTL, 0);
-
-    if (curr->arch.hvm.vmx.ipt_state.ctl)
+    if ( unlikely(curr->arch.hvm.vmx.ipt_state) )
     {
-        wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state.output_base);
-        wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state.output_mask);
-        wrmsrl(MSR_IA32_RTIT_STATUS, curr->arch.hvm.vmx.ipt_state.status);
-        wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state.ctl);
+        wrmsrl(MSR_IA32_RTIT_CTL, 0);
+
+        if (curr->arch.hvm.vmx.ipt_state->ctl)
+        {
+            wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, curr->arch.hvm.vmx.ipt_state->output_base);
+            wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, curr->arch.hvm.vmx.ipt_state->output_mask);
+            wrmsrl(MSR_IA32_RTIT_STATUS, curr->arch.hvm.vmx.ipt_state->status);
+
+            // MSR_IA32_RTIT_CTL is context-switched manually instead of being
+            // stored inside VMCS, as of Q2'20 only the most recent processors
+            // support such field in VMCS
+            wrmsrl(MSR_IA32_RTIT_CTL, curr->arch.hvm.vmx.ipt_state->ctl);
+        }
     }
 
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )

@@ -82,6 +82,7 @@ int xc_tbuf_get_size(xc_interface *xch, unsigned long *size)
 int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t size)
 {
     DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
+    int rc = -1;
 
     arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
     if ( arg == NULL )
@@ -93,8 +94,11 @@ int xc_ptbuf_enable(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t s
     arg->vcpu = vcpu;
     arg->size = size;
 
-    return xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
                   HYPERCALL_BUFFER_AS_ARG(arg));
+
+    xc_hypercall_buffer_free(xch, arg);
+    return rc;
 }
 
 int xc_ptbuf_get_offset(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t *offset)
@@ -119,6 +123,7 @@ int xc_ptbuf_get_offset(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64
         *offset = arg->offset;
     }
 
+    xc_hypercall_buffer_free(xch, arg);
     return rc;
 }
 
@@ -151,6 +156,7 @@ int xc_ptbuf_map(xc_interface *xch, uint32_t domid, uint32_t vcpu, uint8_t **buf
         *size = arg->size;
     }
 
+    xc_hypercall_buffer_free(xch, arg);
     return rc;
 }
 
@@ -163,6 +169,7 @@ int xc_ptbuf_unmap(xc_interface *xch, uint8_t *buf, uint64_t size)
 int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, uint32_t vcpu)
 {
     DECLARE_HYPERCALL_BUFFER(xen_hvm_ipt_op_t, arg);
+    int rc = -1;
 
     arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
     if ( arg == NULL )
@@ -173,8 +180,11 @@ int xc_ptbuf_disable(xc_interface *xch, uint32_t domid, uint32_t vcpu)
     arg->domain = domid;
     arg->vcpu = vcpu;
 
-    return xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
-                    HYPERCALL_BUFFER_AS_ARG(arg));
+    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_ipt,
+                  HYPERCALL_BUFFER_AS_ARG(arg));
+
+    xc_hypercall_buffer_free(xch, arg);
+    return rc;
 }
 
 int xc_tbuf_enable(xc_interface *xch, unsigned long pages, unsigned long *mfn,

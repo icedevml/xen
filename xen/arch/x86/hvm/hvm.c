@@ -4962,7 +4962,6 @@ static int do_ipt_op(
     }
 
     d = rcu_lock_domain_by_any_id(a.domain);
-    domain_pause(d);
 
     if ( d == NULL )
         return -ESRCH;
@@ -4973,7 +4972,9 @@ static int do_ipt_op(
         goto out;
     }
 
-    if (a.vcpu >= d->max_vcpus)
+    domain_pause(d);
+
+    if ( a.vcpu >= d->max_vcpus )
     {
         rc = -EINVAL;
         goto out;
@@ -4981,19 +4982,24 @@ static int do_ipt_op(
 
     v = d->vcpu[a.vcpu];
 
-    if (a.cmd == HVMOP_ipt_enable)
+    if ( a.cmd == HVMOP_ipt_enable )
     {
-        if (v->arch.hvm.vmx.ipt_state.enabled) {
+        if ( v->arch.hvm.vmx.ipt_state ) {
             // already enabled
             rc = -EINVAL;
             goto out;
         }
 
+        if ( a.size < PAGE_SIZE || a.size > 1000000 * PAGE_SIZE ) {
+            // we don't accept trace buffer size smaller than single page
+            // and the upper bound is defined as 4GB in the specification
+            rc = -EINVAL;
+            goto out;
+	}
+
         buf_order = get_order_from_bytes(a.size);
 
-        if ((a.size >> PAGE_SHIFT) != (1 << buf_order) || a.size < PAGE_SIZE || a.size > 1000000 * PAGE_SIZE) {
-            // order must be a power of 2
-            // range from 4 kB to 4 GB
+        if ( (a.size >> PAGE_SHIFT) != (1 << buf_order) ) {
             rc = -EINVAL;
             goto out;
         }
@@ -5001,68 +5007,68 @@ static int do_ipt_op(
         buf = page_to_virt(alloc_domheap_pages(d, buf_order, MEMF_no_owner));
         buf_size = a.size;
 
-        if (!buf) {
+        if ( !buf ) {
             rc = -EFAULT;
             goto out;
         }
 
         memset(buf, 0, buf_size);
 
-        for (i = 0; i < (buf_size >> PAGE_SHIFT); i++) {
+        for ( i = 0; i < (buf_size >> PAGE_SHIFT); i++ ) {
             share_xen_page_with_privileged_guests(virt_to_page(buf) + i, SHARE_ro);
         }
 
-        v->arch.hvm.vmx.ipt_state.enabled = 1;
-        v->arch.hvm.vmx.ipt_state.output_base = virt_to_mfn(buf) << PAGE_SHIFT;
-        v->arch.hvm.vmx.ipt_state.output_mask = buf_size - 1;
-        v->arch.hvm.vmx.ipt_state.status = 0;
-        v->arch.hvm.vmx.ipt_state.ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
+        v->arch.hvm.vmx.ipt_state = xmalloc(struct ipt_state);
+        v->arch.hvm.vmx.ipt_state->output_base = virt_to_mfn(buf) << PAGE_SHIFT;
+        v->arch.hvm.vmx.ipt_state->output_mask = buf_size - 1;
+        v->arch.hvm.vmx.ipt_state->status = 0;
+        v->arch.hvm.vmx.ipt_state->ctl = RTIT_CTL_TRACEEN | RTIT_CTL_OS | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
     }
-    else if (a.cmd == HVMOP_ipt_disable)
+    else if ( a.cmd == HVMOP_ipt_disable )
     {
-        if (!v->arch.hvm.vmx.ipt_state.enabled) {
+        if ( !v->arch.hvm.vmx.ipt_state ) {
             rc = -EINVAL;
             goto out;
         }
 
-        buf_mfn = v->arch.hvm.vmx.ipt_state.output_base >> PAGE_SHIFT;
-        buf_size = (v->arch.hvm.vmx.ipt_state.output_mask + 1) & 0xFFFFFFFFUL;
+        buf_mfn = v->arch.hvm.vmx.ipt_state->output_base >> PAGE_SHIFT;
+        buf_size = ( v->arch.hvm.vmx.ipt_state->output_mask + 1 ) & 0xFFFFFFFFUL;
 
-        for (i = 0; i < (buf_size >> PAGE_SHIFT); i++)
+        for ( i = 0; i < (buf_size >> PAGE_SHIFT); i++ )
         {
-            if ((mfn_to_page(_mfn(buf_mfn + i))->count_info & PGC_count_mask) != 1)
+            if ( (mfn_to_page(_mfn(buf_mfn + i))->count_info & PGC_count_mask) != 1 )
             {
                 rc = -EBUSY;
                 goto out;
             }
         }
 
-        v->arch.hvm.vmx.ipt_state.enabled = 0;
-        v->arch.hvm.vmx.ipt_state.ctl = 0;
+        xfree(v->arch.hvm.vmx.ipt_state);
+	v->arch.hvm.vmx.ipt_state = NULL;
 
-        for (i = 0; i < (buf_size >> PAGE_SHIFT); i++)
+        for ( i = 0; i < (buf_size >> PAGE_SHIFT); i++ )
         {
             free_shared_domheap_page(mfn_to_page(_mfn(buf_mfn + i)));
         }
     }
-    else if (a.cmd == HVMOP_ipt_get_buf)
+    else if ( a.cmd == HVMOP_ipt_get_buf )
     {
-        if (!v->arch.hvm.vmx.ipt_state.enabled) {
+        if ( !v->arch.hvm.vmx.ipt_state ) {
             rc = -EINVAL;
             goto out;
         }
 
-        a.mfn = v->arch.hvm.vmx.ipt_state.output_base >> PAGE_SHIFT;
-        a.size = (v->arch.hvm.vmx.ipt_state.output_mask + 1) & 0xFFFFFFFFUL;
+        a.mfn = v->arch.hvm.vmx.ipt_state->output_base >> PAGE_SHIFT;
+        a.size = (v->arch.hvm.vmx.ipt_state->output_mask + 1) & 0xFFFFFFFFUL;
     }
-    else if (a.cmd == HVMOP_ipt_get_offset)
+    else if ( a.cmd == HVMOP_ipt_get_offset )
     {
-        if (!v->arch.hvm.vmx.ipt_state.enabled) {
+        if ( !v->arch.hvm.vmx.ipt_state ) {
             rc = -EINVAL;
             goto out;
         }
 
-        a.offset = v->arch.hvm.vmx.ipt_state.output_mask >> 32;
+        a.offset = v->arch.hvm.vmx.ipt_state->output_mask >> 32;
     }
 
     rc = -EFAULT;
