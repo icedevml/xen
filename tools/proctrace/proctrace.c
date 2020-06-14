@@ -53,7 +53,9 @@ void term_handler(int signum) {
 
 int main(int argc, char* argv[]) {
     xc_interface *xc;
-    int domid;
+    uint32_t domid;
+    uint32_t vcpu_id;
+
     int rc = -1;
     uint8_t *buf;
     uint64_t size;
@@ -61,14 +63,15 @@ int main(int argc, char* argv[]) {
 
     signal(SIGINT, term_handler);
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <domid>\n", argv[0]);
+    if (argc != 3) {
+        fprintf(stderr, "Usage: %s <domid> <vcpu_id>\n", argv[0]);
 	fprintf(stderr, "It's recommended to redirect this program's output to file\n");
 	fprintf(stderr, "or to pipe it's output to xxd or other program.\n");
 	return 1;
     }
 
     domid = atoi(argv[1]);
+    vcpu_id = atoi(argv[2]);
 
     xc = xc_interface_open(0, 0, 0);
 
@@ -77,14 +80,14 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    rc = xc_ptbuf_enable(xc, domid, 0, 64 * 1024 * 1024);
+    rc = xc_ptbuf_enable(xc, domid, vcpu_id, 64 * 1024 * 1024);
 
     if (rc) {
         fprintf(stderr, "Failed to call xc_ptbuf_enable\n");
 	return 1;
     }
 
-    rc = xc_ptbuf_map(xc, domid, 0, &buf, &size);
+    rc = xc_ptbuf_map(xc, domid, vcpu_id, &buf, &size);
 
     if (rc) {
         fprintf(stderr, "Failed to call xc_ptbuf_map\n");
@@ -93,7 +96,7 @@ int main(int argc, char* argv[]) {
 
     while (!interrupted) {
         uint64_t offset;
-        rc = xc_ptbuf_get_offset(xc, domid, 0, &offset);
+        rc = xc_ptbuf_get_offset(xc, domid, vcpu_id, &offset);
 
 	if (rc) {
             fprintf(stderr, "Failed to call xc_ptbuf_get_offset\n");
@@ -122,7 +125,7 @@ int main(int argc, char* argv[]) {
 	return 1;
     }
 
-    rc = xc_ptbuf_disable(xc, domid, 0);
+    rc = xc_ptbuf_disable(xc, domid, vcpu_id);
 
     if (rc) {
         fprintf(stderr, "Failed to call xc_ptbuf_disable\n");
