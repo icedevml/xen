@@ -4961,6 +4961,7 @@ static int do_ipt_op(
     uint32_t buf_size;
     uint32_t buf_order;
     uint64_t buf_mfn;
+    struct page_info *pg;
 
     if ( !hvm_ipt_supported() )
         return -EOPNOTSUPP;
@@ -5026,7 +5027,7 @@ static int do_ipt_op(
             goto out;
         }
 
-        buf = page_to_virt(alloc_domheap_pages(d, buf_order, MEMF_no_owner));
+        buf = page_to_virt(alloc_domheap_pages(d, buf_order, MEMF_no_refcount));
         buf_size = a.size;
 
         if ( !buf ) {
@@ -5070,7 +5071,13 @@ static int do_ipt_op(
 
         for ( i = 0; i < (buf_size >> PAGE_SHIFT); i++ )
         {
-            free_shared_domheap_page(mfn_to_page(_mfn(buf_mfn + i)));
+            pg = mfn_to_page(_mfn(buf_mfn + i));
+            put_page_alloc_ref(pg);
+            if ( !test_and_clear_bit(_PGC_xen_heap, &pg->count_info) )
+                ASSERT_UNREACHABLE();
+            pg->u.inuse.type_info = 0;
+            page_set_owner(pg, NULL);
+            free_domheap_page(pg);
         }
     }
     else if ( a.cmd == HVMOP_ipt_get_buf )

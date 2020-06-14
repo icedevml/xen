@@ -2583,8 +2583,6 @@ const struct hvm_function_table * __init start_vmx(void)
         printk("VMX: Intel Processor Trace is SUPPORTED");
     }
 
-    setup_vmcs_dump();
-
     lbr_tsx_fixup_check();
     ler_to_fixup_check();
 
