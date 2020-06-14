@@ -60,6 +60,14 @@ int main(int argc, char* argv[]) {
     uint64_t last_offset = 0;
 
     signal(SIGINT, term_handler);
+
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <domid>\n", argv[0]);
+	fprintf(stderr, "It's recommended to redirect this program's output to file\n");
+	fprintf(stderr, "or to pipe it's output to xxd or other program.\n");
+	return 1;
+    }
+
     domid = atoi(argv[1]);
 
     xc = xc_interface_open(0, 0, 0);
