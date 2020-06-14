@@ -1,20 +1,13 @@
 /******************************************************************************
- * tools/xenbaked.c
+ * tools/proctrace.c
  *
- * Tool for collecting raw trace buffer data from Xen and 
- *  performing some accumulation operations and other processing
- *  on it.
+ * Demonstrative tool for collecting Intel Processor Trace data from Xen.
+ *  Could be used to externally monitor a given vCPU in given DomU.
  *
- * Copyright (C) 2004 by Intel Research Cambridge
- * Copyright (C) 2005 by Hewlett Packard, Palo Alto and Fort Collins
- * Copyright (C) 2006 by Hewlett Packard Fort Collins
+ * Copyright (C) 2020 by CERT Polska - NASK PIB
  *
- * Authors: Diwaker Gupta, diwaker.gupta@hp.com
- *          Rob Gardner, rob.gardner@hp.com
- *          Lucy Cherkasova, lucy.cherkasova.hp.com
- * Much code based on xentrace, authored by Mark Williamson, 
- * mark.a.williamson@intel.com
- * Date:   November, 2005
+ * Authors: Michał Leszczyński, michal.leszczynski@cert.pl
+ * Date:    June, 2020
  * 
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -65,9 +58,9 @@ int main(int argc, char* argv[]) {
 
     if (argc != 3) {
         fprintf(stderr, "Usage: %s <domid> <vcpu_id>\n", argv[0]);
-	fprintf(stderr, "It's recommended to redirect this program's output to file\n");
-	fprintf(stderr, "or to pipe it's output to xxd or other program.\n");
-	return 1;
+        fprintf(stderr, "It's recommended to redirect this program's output to file\n");
+        fprintf(stderr, "or to pipe it's output to xxd or other program.\n");
+        return 1;
     }
 
     domid = atoi(argv[1]);
@@ -84,52 +77,52 @@ int main(int argc, char* argv[]) {
 
     if (rc) {
         fprintf(stderr, "Failed to call xc_ptbuf_enable\n");
-	return 1;
+        return 1;
     }
 
     rc = xc_ptbuf_map(xc, domid, vcpu_id, &buf, &size);
 
     if (rc) {
         fprintf(stderr, "Failed to call xc_ptbuf_map\n");
-	return 1;
+        return 1;
     }
 
     while (!interrupted) {
         uint64_t offset;
         rc = xc_ptbuf_get_offset(xc, domid, vcpu_id, &offset);
 
-	if (rc) {
+        if (rc) {
             fprintf(stderr, "Failed to call xc_ptbuf_get_offset\n");
-	    return 1;
-	}
+            return 1;
+        }
 
-	if (offset > last_offset)
-	{
+        if (offset > last_offset)
+        {
             fwrite(buf + last_offset, offset - last_offset, 1, stdout);
-	}
-	else
-	{
+        }
+        else
+        {
             // buffer wrapped
-	    fwrite(buf + last_offset, size - last_offset, 1, stdout);
-	    fwrite(buf, offset, 1, stdout);
-	}
+            fwrite(buf + last_offset, size - last_offset, 1, stdout);
+            fwrite(buf, offset, 1, stdout);
+        }
 
         last_offset = offset;
-	usleep(1000 * 100);
+        usleep(1000 * 100);
     }
 
     rc = xc_ptbuf_unmap(xc, buf, size);
 
     if (rc) {
         fprintf(stderr, "Failed to call xc_ptbuf_unmap\n");
-	return 1;
+        return 1;
     }
 
     rc = xc_ptbuf_disable(xc, domid, vcpu_id);
 
     if (rc) {
         fprintf(stderr, "Failed to call xc_ptbuf_disable\n");
-	return 1;
+        return 1;
     }
 
     return 0;
