@@ -1081,14 +1081,15 @@ static int acquire_resource(
 
     total_frames = xmar.nr_frames;
 
-    if ( xmar.nr_frames > ARRAY_SIZE(mfn_list) )
-        xmar.nr_frames = ARRAY_SIZE(mfn_list);
-
     if ( *start_extent )
     {
         xmar.frame += *start_extent;
+        xmar.nr_frames -= *start_extent;
         guest_handle_add_offset(xmar.frame_list, *start_extent);
     }
+
+    if ( xmar.nr_frames > ARRAY_SIZE(mfn_list) )
+        xmar.nr_frames = ARRAY_SIZE(mfn_list);
 
     rc = rcu_lock_remote_domain_by_id(xmar.domid, &d);
     if ( rc )

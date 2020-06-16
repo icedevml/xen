@@ -4624,6 +4624,33 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
         }
         break;
     }
+
+    case XENMEM_resource_vmtrace_buf:
+    {
+        mfn_t mfn;
+        unsigned int i;
+        struct ipt_state *ipt;
+        rc = -EINVAL;
+
+        if ( id >= d->max_vcpus )
+            break;
+
+        ipt = d->vcpu[id]->arch.hvm.vmx.ipt_state;
+
+        if ( !ipt )
+            break;
+
+        mfn = _mfn(ipt->output_base >> PAGE_SHIFT);
+
+        if ( frame + nr_frames > (ipt->output_mask.size >> PAGE_SHIFT) + 1 )
+            break;
+
+        rc = 0;
+        for ( i = 0; i < nr_frames; i++ )
+            mfn_list[i] = mfn_x(mfn_add(mfn, frame + i));
+
+        break;
+    }
 #endif
 
     default:

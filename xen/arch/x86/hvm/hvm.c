@@ -606,6 +606,43 @@ static int hvm_print_line(
     return X86EMUL_OKAY;
 }
 
+static int vmtrace_alloc_buffers(struct vcpu *v, uint64_t size)
+{
+    struct page_info *pg;
+    struct ipt_state *ipt;
+
+    if ( size < PAGE_SIZE || size > GB(4) || (size & (size - 1)) )
+    {
+        /*
+         * We don't accept trace buffer size smaller than single page
+         * and the upper bound is defined as 4GB in the specification.
+         * The buffer size must be also a power of 2.
+         */
+        return -EINVAL;
+    }
+
+    if ( vmx_add_host_load_msr(v, MSR_RTIT_CTL, 0) )
+        return -EFAULT;
+
+    pg = alloc_domheap_pages(v->domain, get_order_from_bytes(size),
+                             MEMF_no_refcount);
+
+    if ( !pg )
+        return -ENOMEM;
+
+    ipt = xzalloc(struct ipt_state);
+
+    if ( !ipt )
+        return -ENOMEM;
+
+    ipt->output_base = page_to_maddr(pg);
+    ipt->output_mask.raw = size - 1;
+
+    v->arch.hvm.vmx.ipt_state = ipt;
+
+    return 0;
+}
+
 int hvm_domain_initialise(struct domain *d)
 {
     unsigned int nr_gsis;
@@ -1594,6 +1631,13 @@ int hvm_vcpu_initialise(struct vcpu *v)
         hvm_set_guest_tsc(v, 0);
     }
 
+    if ( d->vmtrace_pt_size )
+    {
+        rc = vmtrace_alloc_buffers(v, d->vmtrace_pt_size);
+        if ( rc != 0 )
+            goto fail1;
+    }
+
     return 0;
 
  fail6:
@@ -1610,6 +1654,20 @@ int hvm_vcpu_initialise(struct vcpu *v)
  fail1:
     viridian_vcpu_deinit(v);
     return rc;
+}
+
+void hvm_vmtrace_destroy(struct vcpu *v)
+{
+    struct ipt_state *ipt = v->arch.hvm.vmx.ipt_state;
+
+    if ( ipt )
+    {
+        free_domheap_pages(maddr_to_page(ipt->output_base),
+                           get_order_from_bytes(ipt->output_mask.size + 1));
+
+        xfree(ipt);
+        v->arch.hvm.vmx.ipt_state = NULL;
+    }
 }
 
 void hvm_vcpu_destroy(struct vcpu *v)
@@ -1631,6 +1689,8 @@ void hvm_vcpu_destroy(struct vcpu *v)
     vlapic_destroy(v);
 
     hvm_vcpu_cacheattr_destroy(v);
+
+    hvm_vmtrace_destroy(v);
 }
 
 void hvm_vcpu_down(struct vcpu *v)
@@ -4949,6 +5009,104 @@ static int compat_altp2m_op(
     return rc;
 }
 
+static int do_vmtrace_op(XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    struct xen_hvm_vmtrace_op a;
+    struct domain *d;
+    int rc;
+    struct vcpu *v;
+    struct ipt_state *ipt;
+
+    if ( !hvm_pt_supported() )
+        return -EOPNOTSUPP;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    if ( a.version != HVMOP_VMTRACE_INTERFACE_VERSION )
+        return -EINVAL;
+
+    d = rcu_lock_domain_by_any_id(a.domain);
+
+    if ( d == NULL )
+        return -ESRCH;
+
+    if ( !is_hvm_domain(d) )
+    {
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+    if ( a.vcpu >= d->max_vcpus )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    v = d->vcpu[a.vcpu];
+    ipt = v->arch.hvm.vmx.ipt_state;
+
+    if ( !ipt )
+    {
+        /* PT must be first initialized upon domain creation. */
+        rc = -EINVAL;
+        goto out;
+    }
+
+    switch ( a.cmd )
+    {
+    case HVMOP_vmtrace_ipt_enable:
+        spin_lock(&d->vmtrace_lock);
+        vcpu_pause(v);
+        if ( vmx_add_guest_msr(v, MSR_RTIT_CTL,
+                               RTIT_CTL_TRACEEN | RTIT_CTL_OS |
+                               RTIT_CTL_USR | RTIT_CTL_BRANCH_EN) )
+        {
+            rc = -EFAULT;
+            goto out;
+        }
+
+        ipt->active = 1;
+        vcpu_unpause(v);
+        spin_unlock(&d->vmtrace_lock);
+        break;
+
+    case HVMOP_vmtrace_ipt_disable:
+        spin_lock(&d->vmtrace_lock);
+        vcpu_pause(v);
+        if ( vmx_add_guest_msr(v, MSR_RTIT_CTL, 0) )
+        {
+            rc = -EFAULT;
+            goto out;
+        }
+
+        ipt->active = 0;
+        vcpu_unpause(v);
+        spin_unlock(&d->vmtrace_lock);
+        break;
+
+    case HVMOP_vmtrace_ipt_get_offset:
+        a.offset = ipt->output_mask.offset;
+        break;
+
+    default:
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+    rc = -EFAULT;
+    if ( __copy_to_guest(arg, &a, 1) )
+      goto out;
+    rc = 0;
+
+ out:
+    rcu_unlock_domain(d);
+
+    return rc;
+}
+
+DEFINE_XEN_GUEST_HANDLE(compat_hvm_vmtrace_op_t);
+
 static int hvmop_get_mem_type(
     XEN_GUEST_HANDLE_PARAM(xen_hvm_get_mem_type_t) arg)
 {
@@ -5099,6 +5257,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case HVMOP_altp2m:
         rc = current->hcall_compat ? compat_altp2m_op(arg) : do_altp2m_op(arg);
+        break;
+
+    case HVMOP_vmtrace:
+        rc = do_vmtrace_op(arg);
         break;
 
     default:
