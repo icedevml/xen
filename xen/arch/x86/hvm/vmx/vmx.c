@@ -3667,10 +3667,23 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
     unsigned int vector = 0, mode;
     struct vcpu *v = current;
     struct domain *currd = v->domain;
+    uint64_t rtit_ctl;
 
     __vmread(GUEST_RIP,    &regs->rip);
     __vmread(GUEST_RSP,    &regs->rsp);
     __vmread(GUEST_RFLAGS, &regs->rflags);
+
+    if ( unlikely(v->arch.hvm.vmx.ipt_state) )
+    {
+        smp_rmb();
+        rdmsrl(MSR_RTIT_CTL, rtit_ctl);
+
+        if ( rtit_ctl & RTIT_CTL_TRACEEN )
+            BUG();
+
+        rdmsrl(MSR_RTIT_STATUS, v->arch.hvm.vmx.ipt_state->status);
+        rdmsrl(MSR_RTIT_OUTPUT_MASK, v->arch.hvm.vmx.ipt_state->output_mask.raw);
+    }
 
     hvm_invalidate_regs_fields(regs);
 
@@ -4471,6 +4484,16 @@ bool vmx_vmenter_helper(const struct cpu_user_regs *regs)
     }
 
  out:
+    if ( unlikely(curr->arch.hvm.vmx.ipt_state) )
+    {
+        wrmsrl(MSR_RTIT_OUTPUT_BASE,
+            curr->arch.hvm.vmx.ipt_state->output_base);
+        wrmsrl(MSR_RTIT_OUTPUT_MASK,
+            curr->arch.hvm.vmx.ipt_state->output_mask.raw);
+        wrmsrl(MSR_RTIT_STATUS,
+            curr->arch.hvm.vmx.ipt_state->status);
+    }
+
     if ( unlikely(curr->arch.hvm.vmx.lbr_flags & LBR_FIXUP_MASK) )
         lbr_fixup();
 

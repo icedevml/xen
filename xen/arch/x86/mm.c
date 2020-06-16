@@ -4624,6 +4624,24 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
         }
         break;
     }
+
+    case XENMEM_resource_vmtrace_buf:
+    {
+        uint64_t output_base;
+	mfn_t mfn;
+	unsigned int i;
+
+        output_base = d->vcpu[id]->arch.hvm.vmx.ipt_state->output_base;
+        mfn = mfn_x(output_base >> PAGE_SHIFT);
+
+        rc = 0;
+        for ( i = 0; i < nr_frames; i++ )
+	{
+	    mfn_list[i] = mfn_add(mfn, i);
+	}
+
+        break;
+    }
 #endif
 
     default:
