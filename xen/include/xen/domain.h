@@ -130,4 +130,6 @@ struct vnuma_info {
 
 void vnuma_destroy(struct vnuma_info *vnuma);
 
+extern bool_t vmtrace_supported;
+
 #endif /* __XEN_DOMAIN_H__ */
