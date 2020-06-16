@@ -4949,6 +4949,162 @@ static int compat_altp2m_op(
     return rc;
 }
 
+static int do_vmtrace_op(XEN_GUEST_HANDLE_PARAM(void) arg)
+{
+    struct xen_hvm_vmtrace_op a;
+    struct domain *d;
+    int rc;
+    unsigned int i;
+    struct vcpu *v;
+    void *buf;
+    size_t buf_size;
+    unsigned int buf_order;
+    mfn_t buf_mfn;
+    struct page_info *pg;
+    struct ipt_state *ipt;
+
+    if ( !hvm_pt_supported() )
+        return -EOPNOTSUPP;
+
+    if ( copy_from_guest(&a, arg, 1) )
+        return -EFAULT;
+
+    if ( a.version != HVMOP_VMTRACE_INTERFACE_VERSION )
+        return -EINVAL;
+
+    d = rcu_lock_domain_by_any_id(a.domain);
+    spin_lock(&d->vmtrace_lock);
+
+    if ( d == NULL )
+        return -ESRCH;
+
+    if ( !is_hvm_domain(d) )
+    {
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+    domain_pause(d);
+
+    if ( a.vcpu >= d->max_vcpus )
+    {
+        rc = -EINVAL;
+        goto out;
+    }
+
+    v = d->vcpu[a.vcpu];
+    ipt = v->arch.hvm.vmx.ipt_state;
+
+    switch ( a.cmd )
+    {
+    case HVMOP_vmtrace_ipt_enable:
+        if ( ipt ) {
+            /* already enabled */
+            rc = -EINVAL;
+            goto out;
+        }
+
+        if ( a.size < PAGE_SIZE ||
+             a.size > GB(4) ||
+             ( a.size & (a.size - 1) ) ) {
+            /* we don't accept trace buffer size smaller than single page
+             * and the upper bound is defined as 4GB in the specification */
+            rc = -EINVAL;
+            goto out;
+        }
+
+        buf_order = get_order_from_bytes(a.size);
+        pg = alloc_domheap_pages(d, buf_order, MEMF_no_refcount);
+
+        if ( !pg )
+        {
+            rc = -EFAULT;
+            goto out;
+        }
+
+        buf = page_to_virt(pg);
+        buf_size = a.size;
+
+        if ( vmx_add_host_load_msr(v, MSR_RTIT_CTL, 0) )
+        {
+            rc = -EFAULT;
+            goto out;
+        }
+
+        if ( vmx_add_guest_msr(v, MSR_RTIT_CTL,
+                               RTIT_CTL_TRACEEN | RTIT_CTL_OS |
+                               RTIT_CTL_USR | RTIT_CTL_BRANCH_EN) )
+        {
+            rc = -EFAULT;
+            goto out;
+        }
+
+        ipt = xmalloc(struct ipt_state);
+
+        if ( !ipt )
+        {
+            rc = -EFAULT;
+            goto out;
+        }
+
+        ipt->output_base = virt_to_mfn(buf) << PAGE_SHIFT;
+        ipt->output_mask.raw = buf_size - 1;
+        ipt->status = 0;
+
+        v->arch.hvm.vmx.ipt_state = ipt;
+        break;
+    case HVMOP_vmtrace_ipt_disable:
+        if ( !ipt ) {
+            rc = -EINVAL;
+            goto out;
+        }
+
+        buf_mfn = ipt->output_base >> PAGE_SHIFT;
+        buf_size = ipt->output_mask.size + 1;
+
+        if ( vmx_add_guest_msr(v, MSR_RTIT_CTL, 0) )
+        {
+            rc = -EFAULT;
+            goto out;
+        }
+
+        xfree(ipt);
+        v->arch.hvm.vmx.ipt_state = NULL;
+
+        for ( i = 0; i < (buf_size >> PAGE_SHIFT); i++ )
+        {
+            pg = mfn_to_page(_mfn(mfn_add(buf_mfn, i)));
+            free_domheap_page(pg);
+        }
+        break;
+    case HVMOP_vmtrace_ipt_get_offset:
+        if ( !ipt ) {
+            rc = -EINVAL;
+            goto out;
+        }
+
+        a.offset = ipt->output_mask.offset;
+        break;
+    default:
+        rc = -EOPNOTSUPP;
+        goto out;
+    }
+
+    rc = -EFAULT;
+    if ( __copy_to_guest(arg, &a, 1) )
+      goto out;
+    rc = 0;
+
+ out:
+    domain_unpause(d);
+    spin_unlock(&d->vmtrace_lock);
+    rcu_unlock_domain(d);
+
+    return rc;
+}
+
+DEFINE_XEN_GUEST_HANDLE(compat_hvm_vmtrace_op_t);
+
 static int hvmop_get_mem_type(
     XEN_GUEST_HANDLE_PARAM(xen_hvm_get_mem_type_t) arg)
 {
@@ -5099,6 +5255,10 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     case HVMOP_altp2m:
         rc = current->hcall_compat ? compat_altp2m_op(arg) : do_altp2m_op(arg);
+        break;
+
+    case HVMOP_vmtrace:
+        rc = do_vmtrace_op(arg);
         break;
 
     default:
