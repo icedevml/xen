@@ -441,6 +441,8 @@ struct domain *domain_create(domid_t domid,
         d->nr_pirqs = min(d->nr_pirqs, nr_irqs);
 
         radix_tree_init(&d->pirq_tree);
+
+        d->vmtrace_pt_size = config->vmtrace_pt_size;
     }
 
     if ( (err = arch_domain_create(d, config)) != 0 )
