@@ -513,6 +513,7 @@ GicVersion GicVersion
 Vuart VuartType
 }
 Altp2M Altp2MMode
+ProcessorTraceBufKb int
 }
 
 type domainBuildInfoTypeUnion interface {
