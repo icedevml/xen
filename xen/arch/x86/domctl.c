@@ -324,6 +324,48 @@ void arch_get_domain_info(const struct domain *d,
 
 #define MAX_IOPORTS 0x10000
 
+static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
+                         XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
+{
+    int rc;
+    struct vcpu *v;
+
+    if ( !hvm_pt_supported() )
+        return -EOPNOTSUPP;
+
+    if ( !is_hvm_domain(d) )
+        return -EOPNOTSUPP;
+
+    if ( op->vcpu >= d->max_vcpus )
+        return -EINVAL;
+
+    v = domain_vcpu(d, op->vcpu);
+    rc = 0;
+
+    switch ( op->cmd )
+    {
+    case HVMOP_vmtrace_pt_enable:
+    case HVMOP_vmtrace_pt_disable:
+        vcpu_pause(v);
+        spin_lock(&d->vmtrace_lock);
+
+        rc = control_pt(v, op->cmd == HVMOP_vmtrace_pt_enable);
+
+        spin_unlock(&d->vmtrace_lock);
+        vcpu_unpause(v);
+        break;
+
+    case HVMOP_vmtrace_pt_get_offset:
+        rc = get_pt_offset(v, &op->offset);
+        break;
+
+    default:
+        rc = -EOPNOTSUPP;
+    }
+
+    return rc;
+}
+
 long arch_do_domctl(
     struct xen_domctl *domctl, struct domain *d,
     XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
@@ -336,6 +378,11 @@ long arch_do_domctl(
 
     switch ( domctl->cmd )
     {
+    case XEN_DOMCTL_vmtrace_op:
+        ret = do_vmtrace_op(d, &domctl->u.vmtrace_op, u_domctl);
+	if ( !ret )
+            copyback = true;
+	break;
 
     case XEN_DOMCTL_shadow_op:
         ret = paging_domctl(d, &domctl->u.shadow_op, u_domctl, 0);

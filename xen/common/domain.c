@@ -135,6 +135,43 @@ static void vcpu_destroy(struct vcpu *v)
     free_vcpu_struct(v);
 }
 
+static int vmtrace_alloc_buffers(struct vcpu *v)
+{
+    struct page_info *pg;
+    uint64_t size = v->domain->vmtrace_pt_size;
+
+    if ( size < PAGE_SIZE || size > GB(4) || (size & (size - 1)) )
+    {
+        /*
+         * We don't accept trace buffer size smaller than single page
+         * and the upper bound is defined as 4GB in the specification.
+         * The buffer size must be also a power of 2.
+         */
+        return -EINVAL;
+    }
+
+    //if ( vmx_add_host_load_msr(v, MSR_RTIT_CTL, 0) )
+    //    return -EFAULT;
+
+    pg = alloc_domheap_pages(v->domain, get_order_from_bytes(size),
+                             MEMF_no_refcount);
+
+    if ( !pg )
+        return -ENOMEM;
+
+    //pt = xzalloc(struct pt_state);
+
+    //if ( !pt )
+    //    return -ENOMEM;
+
+    //pt->output_base = page_to_maddr(pg);
+    //pt->output_mask.raw = size - 1;
+
+    v->arch.vmtrace.pt_buf = pg;
+
+    return 0;
+}
+
 struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
 {
     struct vcpu *v;
@@ -159,6 +196,9 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     v->domain = d;
     v->vcpu_id = vcpu_id;
     v->dirty_cpu = VCPU_CPU_CLEAN;
+
+    if ( vmtrace_alloc_buffers(v) != 0 )
+        return NULL;
 
     spin_lock_init(&v->virq_lock);
 

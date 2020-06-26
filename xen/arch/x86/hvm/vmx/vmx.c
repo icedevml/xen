@@ -2264,6 +2264,23 @@ static bool vmx_get_pending_event(struct vcpu *v, struct x86_event *info)
     return true;
 }
 
+static int vmx_control_pt(struct vcpu *v, bool_t enable)
+{
+    if ( !v->arch.hvm.vmx.pt_state )
+        return -EINVAL;
+
+    v->arch.hvm.vmx.pt_state->active = enable;
+    return 0;
+}
+
+static int vmx_get_pt_offset(struct vcpu *v, uint64_t *offset)
+{
+    if ( !v->arch.hvm.vmx.pt_state )
+        return -EINVAL;
+
+    return v->arch.hvm.vmx.pt_state->output_mask.offset;
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -2319,6 +2336,8 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .altp2m_vcpu_update_vmfunc_ve = vmx_vcpu_update_vmfunc_ve,
     .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,
     .altp2m_vcpu_emulate_vmfunc = vmx_vcpu_emulate_vmfunc,
+    .control_pt = vmx_control_pt,
+    .get_pt_offset = vmx_get_pt_offset,
     .tsc_scaling = {
         .max_ratio = VMX_TSC_MULTIPLIER_MAX,
     },
