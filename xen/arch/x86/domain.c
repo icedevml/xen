@@ -2205,6 +2205,25 @@ int domain_relinquish_resources(struct domain *d)
                 altp2m_vcpu_disable_ve(v);
         }
 
+        for_each_vcpu ( d, v )
+        {
+            unsigned int i;
+
+            if ( !v->vmtrace.pt_buf )
+                continue;
+
+            for ( i = 0; i < (v->domain->vmtrace_pt_size >> PAGE_SHIFT); i++ )
+            {
+                struct page_info *pg = mfn_to_page(
+                    mfn_add(page_to_mfn(v->vmtrace.pt_buf), i));
+
+                put_page_alloc_ref(pg);
+                put_page_and_type(pg);
+            }
+
+            v->vmtrace.pt_buf = NULL;
+        }
+
         if ( is_pv_domain(d) )
         {
             for_each_vcpu ( d, v )

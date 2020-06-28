@@ -137,6 +137,38 @@ static void vcpu_destroy(struct vcpu *v)
     free_vcpu_struct(v);
 }
 
+static int vmtrace_alloc_buffers(struct vcpu *v)
+{
+    unsigned int i;
+    struct page_info *pg;
+    uint64_t size = v->domain->vmtrace_pt_size;
+
+    pg = alloc_domheap_pages(v->domain, get_order_from_bytes(size),
+                             MEMF_no_refcount);
+
+    if ( !pg )
+        return -ENOMEM;
+
+    for ( i = 0; i < (size >> PAGE_SHIFT); i++ )
+    {
+        struct page_info *pg_iter = mfn_to_page(
+            mfn_add(page_to_mfn(pg), i));
+
+        if ( !get_page_and_type(pg_iter, v->domain, PGT_writable_page) )
+        {
+            /*
+             * The domain can't possibly know about this page yet, so failure
+             * here is a clear indication of something fishy going on.
+             */
+            domain_crash(v->domain);
+            return -ENODATA;
+        }
+    }
+
+    v->vmtrace.pt_buf = pg;
+    return 0;
+}
+
 struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
 {
     struct vcpu *v;
@@ -161,6 +193,9 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     v->domain = d;
     v->vcpu_id = vcpu_id;
     v->dirty_cpu = VCPU_CPU_CLEAN;
+
+    if ( d->vmtrace_pt_size && vmtrace_alloc_buffers(v) != 0 )
+        return NULL;
 
     spin_lock_init(&v->virq_lock);
 
@@ -422,6 +457,7 @@ struct domain *domain_create(domid_t domid,
     d->shutdown_code = SHUTDOWN_CODE_INVALID;
 
     spin_lock_init(&d->pbuf_lock);
+    spin_lock_init(&d->vmtrace_lock);
 
     rwlock_init(&d->vnuma_rwlock);
 
