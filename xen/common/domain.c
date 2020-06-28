@@ -137,6 +137,31 @@ static void vcpu_destroy(struct vcpu *v)
     free_vcpu_struct(v);
 }
 
+static int vmtrace_alloc_buffers(struct vcpu *v)
+{
+    struct page_info *pg;
+    uint64_t size = v->domain->vmtrace_pt_size;
+
+    if ( size < PAGE_SIZE || size > GB(4) || (size & (size - 1)) )
+    {
+        /*
+         * We don't accept trace buffer size smaller than single page
+         * and the upper bound is defined as 4GB in the specification.
+         * The buffer size must be also a power of 2.
+         */
+        return -EINVAL;
+    }
+
+    pg = alloc_domheap_pages(v->domain, get_order_from_bytes(size),
+                             MEMF_no_refcount);
+
+    if ( !pg )
+        return -ENOMEM;
+
+    v->arch.vmtrace.pt_buf = pg;
+    return 0;
+}
+
 struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
 {
     struct vcpu *v;
@@ -162,6 +187,9 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     v->vcpu_id = vcpu_id;
     v->dirty_cpu = VCPU_CPU_CLEAN;
 
+    if ( d->vmtrace_pt_size && vmtrace_alloc_buffers(v) != 0 )
+        return NULL;
+
     spin_lock_init(&v->virq_lock);
 
     tasklet_init(&v->continue_hypercall_tasklet, NULL, NULL);
@@ -186,6 +214,9 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
         goto fail_wq;
 
     if ( arch_vcpu_create(v) != 0 )
+        goto fail_sched;
+
+    if ( d->vmtrace_pt_size && vmtrace_init_pt(v) != 0 )
         goto fail_sched;
 
     d->vcpu[vcpu_id] = v;
@@ -422,6 +453,7 @@ struct domain *domain_create(domid_t domid,
     d->shutdown_code = SHUTDOWN_CODE_INVALID;
 
     spin_lock_init(&d->pbuf_lock);
+    spin_lock_init(&d->vmtrace_lock);
 
     rwlock_init(&d->vnuma_rwlock);
 
