@@ -2266,19 +2266,40 @@ static bool vmx_get_pending_event(struct vcpu *v, struct x86_event *info)
 
 static int vmx_control_pt(struct vcpu *v, bool_t enable)
 {
-    if ( !v->arch.hvm.vmx.pt_state )
-        return -EINVAL;
+    printk("entered vmx control\n");
 
+    if ( !v->arch.hvm.vmx.pt_state )
+    {
+        v->arch.hvm.vmx.pt_state = xzalloc(struct pt_state);
+        v->arch.hvm.vmx.pt_state->output_base = page_to_maddr(v->arch.vmtrace.pt_buf);
+        v->arch.hvm.vmx.pt_state->output_mask.raw = v->domain->vmtrace_pt_size - 1;
+
+	if ( vmx_add_host_load_msr(v, MSR_RTIT_CTL, 0) )
+            return -EFAULT;
+
+	if ( vmx_add_guest_msr(v, MSR_RTIT_CTL,
+                                  RTIT_CTL_TRACEEN | RTIT_CTL_OS |
+                                  RTIT_CTL_USR | RTIT_CTL_BRANCH_EN) )
+            return -EFAULT;
+
+	printk("allocated pt %llx %llx\n", (unsigned long long) page_to_maddr(v->arch.vmtrace.pt_buf), (unsigned long long) v->domain->vmtrace_pt_size - 1);
+    }
+
+    printk("exiting vmx\n");
     v->arch.hvm.vmx.pt_state->active = enable;
     return 0;
 }
 
 static int vmx_get_pt_offset(struct vcpu *v, uint64_t *offset)
 {
+    printk("get offset\n");
+
     if ( !v->arch.hvm.vmx.pt_state )
         return -EINVAL;
 
-    return v->arch.hvm.vmx.pt_state->output_mask.offset;
+    printk("done offset\n");
+    *offset = v->arch.hvm.vmx.pt_state->output_mask.offset;
+    return 0;
 }
 
 static struct hvm_function_table __initdata vmx_function_table = {

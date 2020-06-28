@@ -4633,6 +4633,8 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
         struct pt_state *pt;
         rc = -EINVAL;
 
+	printk("entered acquire\n");
+
         if ( id >= d->max_vcpus )
             break;
 
@@ -4650,6 +4652,7 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
         for ( i = 0; i < nr_frames; i++ )
             mfn_list[i] = mfn_x(mfn_add(mfn, frame + i));
 
+	printk("breaking\n");
         break;
     }
 #endif

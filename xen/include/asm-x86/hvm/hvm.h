@@ -669,6 +669,8 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
 
 static inline int control_pt(struct vcpu *v, bool_t enable)
 {
+    printk("entered control pt\n");
+
     if ( hvm_funcs.control_pt )
     {
         return hvm_funcs.control_pt(v, enable);

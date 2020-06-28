@@ -330,6 +330,8 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
     int rc;
     struct vcpu *v;
 
+    printk("vmtrace entered\n");
+
     if ( !hvm_pt_supported() )
         return -EOPNOTSUPP;
 
@@ -346,6 +348,7 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
     {
     case HVMOP_vmtrace_pt_enable:
     case HVMOP_vmtrace_pt_disable:
+        printk("entered case\n");
         vcpu_pause(v);
         spin_lock(&d->vmtrace_lock);
 
@@ -353,10 +356,13 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
 
         spin_unlock(&d->vmtrace_lock);
         vcpu_unpause(v);
+	printk("final\n");
         break;
 
     case HVMOP_vmtrace_pt_get_offset:
+	printk("entered case get offset\n");
         rc = get_pt_offset(v, &op->offset);
+	printk("leaving case\n");
         break;
 
     default:

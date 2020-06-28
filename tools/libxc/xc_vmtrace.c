@@ -28,67 +28,46 @@
 int xc_vmtrace_pt_enable(
         xc_interface *xch, uint32_t domid, uint32_t vcpu)
 {
-    DECLARE_HYPERCALL_BUFFER(xen_hvm_vmtrace_op_t, arg);
-    int rc = -1;
+    DECLARE_DOMCTL;
+    int rc;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-        return -1;
+    domctl.cmd = XEN_DOMCTL_vmtrace_op;
+    domctl.domain = domid;
+    domctl.u.vmtrace_op.cmd = XEN_DOMCTL_vmtrace_pt_enable;
+    domctl.u.vmtrace_op.vcpu = vcpu;
 
-    arg->cmd = HVMOP_vmtrace_pt_enable;
-    arg->domain = domid;
-    arg->vcpu = vcpu;
-
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_vmtrace,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
-
-    xc_hypercall_buffer_free(xch, arg);
+    rc = do_domctl(xch, &domctl);
     return rc;
 }
 
 int xc_vmtrace_pt_get_offset(
         xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t *offset)
 {
-    DECLARE_HYPERCALL_BUFFER(xen_hvm_vmtrace_op_t, arg);
-    int rc = -1;
+    DECLARE_DOMCTL;
+    int rc;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-        return -1;
+    domctl.cmd = XEN_DOMCTL_vmtrace_op;
+    domctl.domain = domid;
+    domctl.u.vmtrace_op.cmd = XEN_DOMCTL_vmtrace_pt_get_offset;
+    domctl.u.vmtrace_op.vcpu = vcpu;
 
-    arg->cmd = HVMOP_vmtrace_pt_get_offset;
-    arg->domain = domid;
-    arg->vcpu = vcpu;
-
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_vmtrace,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
-
-    if ( rc == 0 )
-    {
-        *offset = arg->offset;
-    }
-
-    xc_hypercall_buffer_free(xch, arg);
+    rc = do_domctl(xch, &domctl);
+    if ( !rc )
+        *offset = domctl.u.vmtrace_op.offset;
     return rc;
 }
 
 int xc_vmtrace_pt_disable(xc_interface *xch, uint32_t domid, uint32_t vcpu)
 {
-    DECLARE_HYPERCALL_BUFFER(xen_hvm_vmtrace_op_t, arg);
-    int rc = -1;
+    DECLARE_DOMCTL;
+    int rc;
 
-    arg = xc_hypercall_buffer_alloc(xch, arg, sizeof(*arg));
-    if ( arg == NULL )
-        return -1;
+    domctl.cmd = XEN_DOMCTL_vmtrace_op;
+    domctl.domain = domid;
+    domctl.u.vmtrace_op.cmd = XEN_DOMCTL_vmtrace_pt_disable;
+    domctl.u.vmtrace_op.vcpu = vcpu;
 
-    arg->cmd = HVMOP_vmtrace_pt_disable;
-    arg->domain = domid;
-    arg->vcpu = vcpu;
-
-    rc = xencall2(xch->xcall, __HYPERVISOR_hvm_op, HVMOP_vmtrace,
-                  HYPERCALL_BUFFER_AS_ARG(arg));
-
-    xc_hypercall_buffer_free(xch, arg);
+    rc = do_domctl(xch, &domctl);
     return rc;
 }
 
