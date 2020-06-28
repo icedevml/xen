@@ -1022,11 +1022,60 @@ static unsigned int resource_max_frames(struct domain *d,
     case XENMEM_resource_grant_table:
         return gnttab_resource_max_frames(d, id);
 
+    case XENMEM_resource_vmtrace_buf:
+        return 10000; // FIXME hack
+
     default:
         return arch_resource_max_frames(d, type, id);
     }
 }
 
+static int acquire_vmtrace_buf(struct domain *d, unsigned int id,
+                               uint64_t frame,
+                               uint64_t nr_frames,
+                               xen_pfn_t mfn_list[])
+{
+    mfn_t mfn;
+    unsigned int i;
+    uint64_t size;
+    struct vcpu *v = domain_vcpu(d, id);
+
+    if ( !v || !v->vmtrace.pt_buf )
+        return -EINVAL;
+
+    mfn = page_to_mfn(v->vmtrace.pt_buf);
+    size = v->domain->processor_trace_buf_kb * KB(1);
+
+    if ( (frame > (size >> PAGE_SHIFT)) ||
+         (nr_frames > ((size >> PAGE_SHIFT) - frame)) )
+        return -EINVAL;
+
+    for ( i = 0; i < nr_frames; i++ )
+        mfn_list[i] = mfn_x(mfn_add(mfn, frame + i));
+
+    return 0;
+}
+
+static int _acquire_2(unsigned int id, unsigned long frame,
+                      unsigned int nr_frames, xen_pfn_t mfn_list[])
+{
+    unsigned int i;
+
+    for ( i = 0; i < nr_frames; ++i )
+    {
+        mfn_list[i] = 0xdead0000 + frame + i;
+
+        /* Simulate some -ERESTARTs */
+        if ( i && ((frame + i) == 22 ||
+                   (frame + i) == 37 ||
+                   (frame + i) == 1040) )
+            break;
+    }
+
+    return i;
+}
+
+>>>>>>> 666eb1e23e... x86/mm: add vmtrace_buf resource type
 /*
  * Returns -errno on error, or positive in the range [1, nr_frames] on
  * success.  Returning less than nr_frames contitutes a request for a
@@ -1040,6 +1089,10 @@ static int _acquire_resource(
     {
     case XENMEM_resource_grant_table:
         return gnttab_acquire_resource(d, id, frame, nr_frames, mfn_list);
+
+    case XENMEM_resource_vmtrace_buf:
+        return acquire_vmtrace_buf(d, xmar.id, xmar.frame, xmar.nr_frames,
+                                   mfn_list);
 
     default:
         return arch_acquire_resource(d, type, id, frame, nr_frames, mfn_list);
