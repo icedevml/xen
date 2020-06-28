@@ -216,6 +216,7 @@ struct hvm_function_table {
 
     /* vmtrace */
     int (*vmtrace_control_pt)(struct vcpu *v, bool enable);
+    int (*vmtrace_set_pt_option)(struct vcpu *v, uint32_t key, uint32_t value);
     int (*vmtrace_get_pt_offset)(struct vcpu *v, uint64_t *offset, uint64_t *size);
 
     /*
@@ -663,6 +664,14 @@ static inline int vmtrace_control_pt(struct vcpu *v, bool enable)
 {
     if ( hvm_funcs.vmtrace_control_pt )
         return hvm_funcs.vmtrace_control_pt(v, enable);
+
+    return -EOPNOTSUPP;
+}
+
+static inline int vmtrace_set_pt_option(struct vcpu *v, uint32_t key, uint32_t value)
+{
+    if ( hvm_funcs.vmtrace_set_pt_option )
+        return hvm_funcs.vmtrace_set_pt_option(v, key, value);
 
     return -EOPNOTSUPP;
 }
