@@ -627,6 +627,10 @@ struct arch_vcpu
     struct {
         bool next_interrupt_enabled;
     } monitor;
+
+    struct {
+        struct page_info *pt_buf;
+    } vmtrace;
 };
 
 struct guest_memory_policy
