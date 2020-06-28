@@ -2199,6 +2199,17 @@ int domain_relinquish_resources(struct domain *d)
                 altp2m_vcpu_disable_ve(v);
         }
 
+        for_each_vcpu ( d, v )
+        {
+            if ( !v->arch.vmtrace.pt_buf )
+                continue;
+
+            vmtrace_destroy_pt(v);
+
+            free_domheap_pages(v->arch.vmtrace.pt_buf,
+                get_order_from_bytes(v->domain->vmtrace_pt_size));
+        }
+
         if ( is_pv_domain(d) )
         {
             for_each_vcpu ( d, v )
