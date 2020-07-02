@@ -216,9 +216,6 @@ struct vcpu *vcpu_create(struct domain *d, unsigned int vcpu_id)
     if ( arch_vcpu_create(v) != 0 )
         goto fail_sched;
 
-    if ( d->vmtrace_pt_size && vmtrace_init_pt(v) != 0 )
-        goto fail_sched;
-
     d->vcpu[vcpu_id] = v;
     if ( vcpu_id != 0 )
     {
