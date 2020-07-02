@@ -428,6 +428,48 @@ static void vmx_domain_relinquish_resources(struct domain *d)
     vmx_free_vlapic_mapping(d);
 }
 
+static int vmx_init_pt(struct vcpu *v)
+{
+    int rc;
+
+    v->arch.hvm.vmx.pt_state = xzalloc(struct pt_state);
+
+    if ( !v->arch.hvm.vmx.pt_state )
+        return -ENOMEM;
+
+    if ( !v->arch.vmtrace.pt_buf || !v->domain->vmtrace_pt_size )
+        return -EINVAL;
+
+    v->arch.hvm.vmx.pt_state->output_base =
+        page_to_maddr(v->arch.vmtrace.pt_buf);
+    v->arch.hvm.vmx.pt_state->output_mask.raw =
+        v->domain->vmtrace_pt_size - 1;
+
+    rc = vmx_add_host_load_msr(v, MSR_RTIT_CTL, 0);
+
+    if ( rc )
+        return rc;
+
+    rc = vmx_add_guest_msr(v, MSR_RTIT_CTL,
+                              RTIT_CTL_TRACE_EN | RTIT_CTL_OS |
+                              RTIT_CTL_USR | RTIT_CTL_BRANCH_EN);
+
+    if ( rc )
+        return rc;
+
+    return 0;
+}
+
+static int vmx_destroy_pt(struct vcpu* v)
+{
+    if ( v->arch.hvm.vmx.pt_state )
+        xfree(v->arch.hvm.vmx.pt_state);
+
+    v->arch.hvm.vmx.pt_state = NULL;
+    return 0;
+}
+
+
 static int vmx_vcpu_initialise(struct vcpu *v)
 {
     int rc;
@@ -471,6 +513,14 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     vmx_install_vlapic_mapping(v);
 
+    if ( v->domain->vmtrace_pt_size )
+    {
+        rc = vmx_init_pt(v);
+
+        if ( rc )
+            return rc;
+    }
+
     return 0;
 }
 
@@ -483,6 +533,7 @@ static void vmx_vcpu_destroy(struct vcpu *v)
      * prior to vmx_domain_destroy so we need to disable PML for each vcpu
      * separately here.
      */
+    vmx_destroy_pt(v);
     vmx_vcpu_disable_pml(v);
     vmx_destroy_vmcs(v);
     passive_domain_destroy(v);
@@ -508,8 +559,6 @@ static void vmx_restore_host_msrs(void)
 
 static void vmx_save_guest_msrs(struct vcpu *v)
 {
-    uint64_t rtit_ctl;
-
     /*
      * We cannot cache SHADOW_GS_BASE while the VCPU runs, as it can
      * be updated at any time via SWAPGS, which we cannot trap.
@@ -519,6 +568,7 @@ static void vmx_save_guest_msrs(struct vcpu *v)
     if ( unlikely(v->arch.hvm.vmx.pt_state &&
                   v->arch.hvm.vmx.pt_state->active) )
     {
+        uint64_t rtit_ctl;
         rdmsrl(MSR_RTIT_CTL, rtit_ctl);
         BUG_ON(rtit_ctl & RTIT_CTL_TRACE_EN);
 
@@ -2264,43 +2314,7 @@ static bool vmx_get_pending_event(struct vcpu *v, struct x86_event *info)
     return true;
 }
 
-static int vmx_init_pt(struct vcpu *v)
-{
-    v->arch.hvm.vmx.pt_state = xzalloc(struct pt_state);
-
-    if ( !v->arch.hvm.vmx.pt_state )
-        return -EFAULT;
-
-    if ( !v->arch.vmtrace.pt_buf )
-        return -EINVAL;
-
-    if ( !v->domain->vmtrace_pt_size )
-	return -EINVAL;
-
-    v->arch.hvm.vmx.pt_state->output_base = page_to_maddr(v->arch.vmtrace.pt_buf);
-    v->arch.hvm.vmx.pt_state->output_mask.raw = v->domain->vmtrace_pt_size - 1;
-
-    if ( vmx_add_host_load_msr(v, MSR_RTIT_CTL, 0) )
-        return -EFAULT;
-
-    if ( vmx_add_guest_msr(v, MSR_RTIT_CTL,
-                              RTIT_CTL_TRACE_EN | RTIT_CTL_OS |
-                              RTIT_CTL_USR | RTIT_CTL_BRANCH_EN) )
-        return -EFAULT;
-
-    return 0;
-}
-
-static int vmx_destroy_pt(struct vcpu* v)
-{
-    if ( v->arch.hvm.vmx.pt_state )
-        xfree(v->arch.hvm.vmx.pt_state);
-
-    v->arch.hvm.vmx.pt_state = NULL;
-    return 0;
-}
-
-static int vmx_control_pt(struct vcpu *v, bool_t enable)
+static int vmx_control_pt(struct vcpu *v, bool enable)
 {
     if ( !v->arch.hvm.vmx.pt_state )
         return -EINVAL;
@@ -2373,8 +2387,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .altp2m_vcpu_update_vmfunc_ve = vmx_vcpu_update_vmfunc_ve,
     .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,
     .altp2m_vcpu_emulate_vmfunc = vmx_vcpu_emulate_vmfunc,
-    .vmtrace_init_pt = vmx_init_pt,
-    .vmtrace_destroy_pt = vmx_destroy_pt,
     .vmtrace_control_pt = vmx_control_pt,
     .vmtrace_get_pt_offset = vmx_get_pt_offset,
     .tsc_scaling = {

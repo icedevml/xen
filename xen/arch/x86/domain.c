@@ -2214,8 +2214,6 @@ int domain_relinquish_resources(struct domain *d)
                     return -EBUSY;
             }
 
-            vmtrace_destroy_pt(v);
-
             free_domheap_pages(v->arch.vmtrace.pt_buf,
                 get_order_from_bytes(v->domain->vmtrace_pt_size));
         }

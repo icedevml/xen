@@ -215,9 +215,7 @@ struct hvm_function_table {
     int (*altp2m_vcpu_emulate_vmfunc)(const struct cpu_user_regs *regs);
 
     /* vmtrace */
-    int (*vmtrace_init_pt)(struct vcpu *v);
-    int (*vmtrace_destroy_pt)(struct vcpu *v);
-    int (*vmtrace_control_pt)(struct vcpu *v, bool_t enable);
+    int (*vmtrace_control_pt)(struct vcpu *v, bool enable);
     int (*vmtrace_get_pt_offset)(struct vcpu *v, uint64_t *offset);
 
     /*
@@ -661,23 +659,7 @@ static inline bool altp2m_vcpu_emulate_ve(struct vcpu *v)
     return false;
 }
 
-static inline int vmtrace_init_pt(struct vcpu *v)
-{
-    if ( hvm_funcs.vmtrace_init_pt )
-        return hvm_funcs.vmtrace_init_pt(v);
-
-    return -EOPNOTSUPP;
-}
-
-static inline int vmtrace_destroy_pt(struct vcpu *v)
-{
-    if ( hvm_funcs.vmtrace_destroy_pt )
-        return hvm_funcs.vmtrace_destroy_pt(v);
-
-    return -EOPNOTSUPP;
-}
-
-static inline int vmtrace_control_pt(struct vcpu *v, bool_t enable)
+static inline int vmtrace_control_pt(struct vcpu *v, bool enable)
 {
     if ( hvm_funcs.vmtrace_control_pt )
         return hvm_funcs.vmtrace_control_pt(v, enable);
