@@ -328,6 +328,9 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
     int rc;
     struct vcpu *v;
 
+    if ( op->pad1 || op->pad2 )
+        return -EINVAL;
+
     if ( !vmtrace_supported )
         return -EOPNOTSUPP;
 

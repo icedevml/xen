@@ -1147,7 +1147,9 @@ struct xen_domctl_vmtrace_op {
 #define XEN_DOMCTL_vmtrace_pt_disable     2
 #define XEN_DOMCTL_vmtrace_pt_get_offset  3
     domid_t domain;
+    uint16_t pad1;
     uint32_t vcpu;
+    uint16_t pad2;
     uint64_aligned_t size;
 
     /* OUT variable */
