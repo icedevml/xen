@@ -2210,12 +2210,12 @@ int domain_relinquish_resources(struct domain *d)
             {
                 struct page_info *pg = mfn_to_page(
                     mfn_add(page_to_mfn(v->vmtrace.pt_buf), i));
-                if ( (pg->count_info & PGC_count_mask) != 1 )
-                    return -EBUSY;
+
+                put_page_alloc_ref(pg);
+                put_page_and_type(pg);
             }
 
-            free_domheap_pages(v->vmtrace.pt_buf,
-                get_order_from_bytes(v->domain->vmtrace_pt_size));
+            v->vmtrace.pt_buf = NULL;
         }
 
         if ( is_pv_domain(d) )
