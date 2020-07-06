@@ -1008,8 +1008,8 @@ static long xatp_permission_check(struct domain *d, unsigned int space)
 }
 
 static int acquire_vmtrace_buf(struct domain *d, unsigned int id,
-                               unsigned long frame,
-                               unsigned int nr_frames,
+                               uint64_t frame,
+                               uint64_t nr_frames,
                                xen_pfn_t mfn_list[])
 {
     mfn_t mfn;
@@ -1021,7 +1021,8 @@ static int acquire_vmtrace_buf(struct domain *d, unsigned int id,
 
     mfn = page_to_mfn(v->vmtrace.pt_buf);
 
-    if ( frame + nr_frames > (v->domain->vmtrace_pt_size >> PAGE_SHIFT) )
+    if ( (frame > (v->domain->vmtrace_pt_size >> PAGE_SHIFT)) ||
+         (nr_frames > ((v->domain->vmtrace_pt_size >> PAGE_SHIFT) - frame)) )
         return -EINVAL;
 
     for ( i = 0; i < nr_frames; i++ )
