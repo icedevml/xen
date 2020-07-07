@@ -348,11 +348,7 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
     case XEN_DOMCTL_vmtrace_pt_enable:
     case XEN_DOMCTL_vmtrace_pt_disable:
         vcpu_pause(v);
-        spin_lock(&d->vmtrace_lock);
-
         rc = vmtrace_control_pt(v, op->cmd == XEN_DOMCTL_vmtrace_pt_enable);
-
-        spin_unlock(&d->vmtrace_lock);
         vcpu_unpause(v);
         break;
 
