@@ -499,7 +499,7 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
          */
         config->flags |= XEN_DOMCTL_CDF_oos_off;
 
-    if ( !hvm && config->vmtrace_pt_order )
+    if ( !hvm && config->processor_trace_buf_kb )
     {
         dprintk(XENLOG_INFO, "Processor trace is not supported on non-HVM\n");
         return -EINVAL;

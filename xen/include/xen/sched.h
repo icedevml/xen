@@ -462,8 +462,7 @@ struct domain
     spinlock_t  pbuf_lock;
 
     /* Used by vmtrace features */
-    spinlock_t  vmtrace_lock;
-    uint64_t    vmtrace_pt_size;
+    uint32_t    processor_trace_buf_kb;
 
     /* OProfile support. */
     struct xenoprof *xenoprof;

@@ -373,7 +373,7 @@ static int sanitise_domain_config(struct xen_domctl_createdomain *config)
         return -EINVAL;
     }
 
-    if ( config->vmtrace_pt_order && !vmtrace_supported )
+    if ( config->processor_trace_buf_kb && !vmtrace_supported )
     {
         dprintk(XENLOG_INFO, "Processor tracing is not supported\n");
         return -EINVAL;
@@ -486,11 +486,8 @@ struct domain *domain_create(domid_t domid,
 
         radix_tree_init(&d->pirq_tree);
 
-        if ( config->vmtrace_pt_order )
-        {
-            uint32_t shift_val = config->vmtrace_pt_order + PAGE_SHIFT;
-            d->vmtrace_pt_size = (1ULL << shift_val);
-        }
+        if ( config->processor_trace_buf_kb )
+            d->processor_trace_buf_kb = config->processor_trace_buf_kb;
     }
 
     if ( (err = arch_domain_create(d, config)) != 0 )
