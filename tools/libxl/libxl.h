@@ -439,12 +439,12 @@
 #define LIBXL_HAVE_CREATEINFO_PASSTHROUGH 1
 
 /*
- * LIBXL_HAVE_VMTRACE_PT_ORDER indicates that
- * libxl_domain_create_info has a vmtrace_pt_order parameter, which
- * allows to enable pre-allocation of processor tracing buffers
- * with the given order of size.
+ * LIBXL_HAVE_PROCESSOR_TRACE_BUF_KB indicates that
+ * libxl_domain_create_info has a processor_trace_buf_kb parameter, which
+ * allows to enable pre-allocation of processor tracing buffers of given
+ * size.
  */
-#define LIBXL_HAVE_VMTRACE_PT_ORDER 1
+#define LIBXL_HAVE_PROCESSOR_TRACE_BUF_KB 1
 
 /*
  * libxl ABI compatibility
