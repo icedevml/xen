@@ -353,7 +353,7 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
         break;
 
     case XEN_DOMCTL_vmtrace_pt_get_offset:
-        rc = vmtrace_get_pt_offset(v, &op->offset);
+        rc = vmtrace_get_pt_offset(v, &op->offset, &op->size);
 
         if ( !rc && d->is_dying )
             rc = ENODATA;

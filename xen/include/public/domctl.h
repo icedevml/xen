@@ -1150,9 +1150,9 @@ struct xen_domctl_vmtrace_op {
     uint16_t pad1;
     uint32_t vcpu;
     uint16_t pad2;
-    uint64_aligned_t size;
 
     /* OUT variable */
+    uint64_aligned_t size;
     uint64_aligned_t offset;
 };
 typedef struct xen_domctl_vmtrace_op xen_domctl_vmtrace_op_t;
