@@ -32,8 +32,6 @@
 #include <xen/xen.h>
 #include <xenforeignmemory.h>
 
-#define BUF_SIZE (16384 * XC_PAGE_SIZE)
-
 volatile int interrupted = 0;
 volatile int domain_down = 0;
 
@@ -45,6 +43,7 @@ int main(int argc, char* argv[]) {
     xc_interface *xc;
     uint32_t domid;
     uint32_t vcpu_id;
+    uint64_t size;
 
     int rc = -1;
     uint8_t *buf = NULL;
@@ -85,12 +84,19 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Failed to call xc_vmtrace_pt_enable\n");
         return 1;
     }
+    
+    rc = xc_vmtrace_pt_get_offset(xc, domid, vcpu_id, NULL, &size);
+
+    if (rc) {
+        fprintf(stderr, "Failed to get trace buffer size\n");
+        return 1;
+    }
 
     fres = xenforeignmemory_map_resource(
         fmem, domid, XENMEM_resource_vmtrace_buf,
         /* vcpu: */ vcpu_id,
         /* frame: */ 0,
-        /* num_frames: */ BUF_SIZE >> XC_PAGE_SHIFT,
+        /* num_frames: */ size >> XC_PAGE_SHIFT,
         (void **)&buf,
         PROT_READ, 0);
 
@@ -101,7 +107,7 @@ int main(int argc, char* argv[]) {
 
     while (!interrupted) {
         uint64_t offset;
-        rc = xc_vmtrace_pt_get_offset(xc, domid, vcpu_id, &offset);
+        rc = xc_vmtrace_pt_get_offset(xc, domid, vcpu_id, &offset, NULL);
 
         if (rc == ENODATA) {
             interrupted = 1;
@@ -118,7 +124,7 @@ int main(int argc, char* argv[]) {
         else if (offset < last_offset)
         {
             // buffer wrapped
-            fwrite(buf + last_offset, BUF_SIZE - last_offset, 1, stdout);
+            fwrite(buf + last_offset, size - last_offset, 1, stdout);
             fwrite(buf, offset, 1, stdout);
         }
 
