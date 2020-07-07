@@ -2331,12 +2331,13 @@ static int vmx_control_pt(struct vcpu *v, bool enable)
     return 0;
 }
 
-static int vmx_get_pt_offset(struct vcpu *v, uint64_t *offset)
+static int vmx_get_pt_offset(struct vcpu *v, uint64_t *offset, uint64_t *size)
 {
     if ( !v->arch.hvm.vmx.ipt_state )
         return -EINVAL;
 
     *offset = v->arch.hvm.vmx.ipt_state->output_mask.offset;
+    *size = v->arch.hvm.vmx.ipt_state->output_mask.size + 1;
     return 0;
 }
 
