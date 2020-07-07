@@ -59,8 +59,11 @@ int xc_vmtrace_pt_get_offset(
     rc = do_domctl(xch, &domctl);
     if ( !rc )
     {
-        *offset = domctl.u.vmtrace_op.offset;
-        *size = domctl.u.vmtrace_op.size;
+        if (offset)
+            *offset = domctl.u.vmtrace_op.offset;
+
+        if (size)
+            *size = domctl.u.vmtrace_op.size;
     }
 
     return rc;
