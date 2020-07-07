@@ -2208,11 +2208,13 @@ int domain_relinquish_resources(struct domain *d)
         for_each_vcpu ( d, v )
         {
             unsigned int i;
+            uint64_t nr_pages = v->domain->processor_trace_buf_kb * KB(1);
+            nr_pages >>= PAGE_SHIFT;
 
             if ( !v->vmtrace.pt_buf )
                 continue;
 
-            for ( i = 0; i < (v->domain->vmtrace_pt_size >> PAGE_SHIFT); i++ )
+            for ( i = 0; i < nr_pages; i++ )
             {
                 struct page_info *pg = mfn_to_page(
                     mfn_add(page_to_mfn(v->vmtrace.pt_buf), i));
