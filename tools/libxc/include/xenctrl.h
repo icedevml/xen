@@ -1619,10 +1619,11 @@ int xc_vmtrace_pt_disable(xc_interface *xch, uint32_t domid,
  * @parm domid domain identifier
  * @parm vcpu vcpu identifier
  * @parm offset current offset inside trace buffer will be written there
+ * @parm size the total size of the trace buffer (in bytes)
  * @return 0 on success, -1 on failure
  */
 int xc_vmtrace_pt_get_offset(xc_interface *xch, uint32_t domid,
-                             uint32_t vcpu, uint64_t *offset);
+                             uint32_t vcpu, uint64_t *offset, uint64_t *size);
 
 int xc_domctl(xc_interface *xch, struct xen_domctl *domctl);
 int xc_sysctl(xc_interface *xch, struct xen_sysctl *sysctl);

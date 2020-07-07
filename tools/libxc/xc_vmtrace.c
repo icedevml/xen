@@ -43,7 +43,8 @@ int xc_vmtrace_pt_enable(
 }
 
 int xc_vmtrace_pt_get_offset(
-        xc_interface *xch, uint32_t domid, uint32_t vcpu, uint64_t *offset)
+        xc_interface *xch, uint32_t domid, uint32_t vcpu,
+        uint64_t *offset, uint64_t *size)
 {
     DECLARE_DOMCTL;
     int rc;
@@ -57,7 +58,11 @@ int xc_vmtrace_pt_get_offset(
 
     rc = do_domctl(xch, &domctl);
     if ( !rc )
+    {
         *offset = domctl.u.vmtrace_op.offset;
+        *size = domctl.u.vmtrace_op.size;
+    }
+
     return rc;
 }
 
