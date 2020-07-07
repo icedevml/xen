@@ -431,7 +431,7 @@ static void vmx_domain_relinquish_resources(struct domain *d)
 static int vmx_init_pt(struct vcpu *v)
 {
     int rc;
-    uint64_t size = v->domain->vmtrace_pt_size;
+    uint64_t size = v->domain->processor_trace_buf_kb * KB(1);
 
     v->arch.hvm.vmx.ipt_state = xzalloc(struct ipt_state);
 
@@ -521,7 +521,7 @@ static int vmx_vcpu_initialise(struct vcpu *v)
 
     vmx_install_vlapic_mapping(v);
 
-    if ( v->domain->vmtrace_pt_size )
+    if ( v->domain->processor_trace_buf_kb )
     {
         rc = vmx_init_pt(v);
 
