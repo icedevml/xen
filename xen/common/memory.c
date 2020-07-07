@@ -1014,15 +1014,17 @@ static int acquire_vmtrace_buf(struct domain *d, unsigned int id,
 {
     mfn_t mfn;
     unsigned int i;
+    uint64_t size;
     struct vcpu *v = domain_vcpu(d, id);
 
     if ( !v || !v->vmtrace.pt_buf )
         return -EINVAL;
 
     mfn = page_to_mfn(v->vmtrace.pt_buf);
+    size = v->domain->processor_trace_buf_kb * KB(1);
 
-    if ( (frame > (v->domain->vmtrace_pt_size >> PAGE_SHIFT)) ||
-         (nr_frames > ((v->domain->vmtrace_pt_size >> PAGE_SHIFT) - frame)) )
+    if ( (frame > (size >> PAGE_SHIFT)) ||
+         (nr_frames > ((size >> PAGE_SHIFT) - frame)) )
         return -EINVAL;
 
     for ( i = 0; i < nr_frames; i++ )
