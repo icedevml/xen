@@ -21,11 +21,14 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <string.h>
 
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <xen-tools/libs.h>
+
+#include <xen/memory.h>
 
 #include "private.h"
 
@@ -337,6 +340,39 @@ int osdep_xenforeignmemory_map_resource(
     }
 
     return 0;
+}
+
+int osdep_xenforeignmemory_resource_size(
+    xenforeignmemory_handle *fmem, domid_t domid, unsigned int type,
+    unsigned int id, unsigned long *nr_frames)
+{
+    int rc;
+    struct xen_mem_acquire_resource *xmar =
+        xencall_alloc_buffer(fmem->xcall, sizeof(*xmar));
+
+    if ( !xmar )
+    {
+        PERROR("Could not bounce memory for acquire_resource hypercall");
+        return -1;
+    }
+
+    *xmar = (struct xen_mem_acquire_resource){
+        .domid = domid,
+        .type = type,
+        .id = id,
+    };
+
+    rc = xencall2(fmem->xcall, __HYPERVISOR_memory_op,
+                  XENMEM_acquire_resource, (uintptr_t)xmar);
+    if ( rc )
+        goto out;
+
+    *nr_frames = xmar->nr_frames;
+
+ out:
+    xencall_free_buffer(fmem->xcall, xmar);
+
+    return rc;
 }
 
 /*
