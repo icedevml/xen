@@ -4587,6 +4587,26 @@ static int handle_iomem_range(unsigned long s, unsigned long e, void *p)
     return err || s > e ? err : _handle_iomem_range(s, e, p);
 }
 
+unsigned int arch_resource_max_frames(
+    const struct domain *d, unsigned int type, unsigned int id)
+{
+    unsigned int nr = 0;
+
+    switch ( type )
+    {
+#ifdef CONFIG_HVM
+    case XENMEM_resource_ioreq_server:
+        if ( !is_hvm_domain(d) )
+            break;
+        /* One frame for the buf-ioreq ring, and one frame per 128 vcpus. */
+        nr = 1 + DIV_ROUND_UP(d->max_vcpus * sizeof(struct ioreq), PAGE_SIZE);
+        break;
+#endif
+    }
+
+    return nr;
+}
+
 int arch_acquire_resource(struct domain *d, unsigned int type,
                           unsigned int id, unsigned long frame,
                           unsigned int nr_frames, xen_pfn_t mfn_list[])
