@@ -4628,7 +4628,6 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
         if ( id != (unsigned int)ioservid )
             break;
 
-        rc = 0;
         for ( i = 0; i < nr_frames; i++ )
         {
             mfn_t mfn;
@@ -4639,6 +4638,9 @@ int arch_acquire_resource(struct domain *d, unsigned int type,
 
             mfn_list[i] = mfn_x(mfn);
         }
+        if ( i == nr_frames )
+            /* Success.  Passed nr_frames back to the caller. */
+            rc = nr_frames;
         break;
     }
 #endif
