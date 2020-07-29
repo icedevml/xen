@@ -642,6 +642,7 @@ struct xen_mem_acquire_resource {
      * IN/OUT
      *
      * As an IN parameter number of frames of the resource to be mapped.
+     * This value may be updated during the course of the operation.
      *
      * When frame_list is NULL and nr_frames is 0, this is interpreted as a
      * request for the size of the resource, which shall be returned in the
@@ -656,7 +657,8 @@ struct xen_mem_acquire_resource {
     uint32_t pad;
     /*
      * IN - the index of the initial frame to be mapped. This parameter
-     *      is ignored if nr_frames is 0.
+     *      is ignored if nr_frames is 0.  This value may be updated
+     *      during the course of the operation.
      */
     uint64_t frame;
 
@@ -672,7 +674,8 @@ struct xen_mem_acquire_resource {
      *          If -EIO is returned then the frame_list has only been
      *          partially mapped and it is up to the caller to unmap all
      *          the GFNs.
-     *          This parameter may be NULL if nr_frames is 0.
+     *          This parameter may be NULL if nr_frames is 0.  This
+     *          value may be updated during the course of the operation.
      */
     XEN_GUEST_HANDLE(xen_pfn_t) frame_list;
 };
