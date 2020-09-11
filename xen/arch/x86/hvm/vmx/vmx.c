@@ -2389,6 +2389,16 @@ static int vmx_get_pt_offset(struct vcpu *v, uint64_t *offset, uint64_t *size)
     return 0;
 }
 
+static int vmx_reset_pt(struct vcpu *v)
+{
+    if ( !v->arch.hvm.vmx.ipt_state || !v->arch.hvm.vmx.ipt_state->active )
+        return -EINVAL;
+
+    v->arch.hvm.vmx.ipt_state->output_mask.offset = 0;
+    v->arch.hvm.vmx.ipt_state->status = 0;
+    return 0;
+}
+
 static struct hvm_function_table __initdata vmx_function_table = {
     .name                 = "VMX",
     .cpu_up_prepare       = vmx_cpu_up_prepare,
@@ -2447,6 +2457,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .vmtrace_control_pt = vmx_control_pt,
     .vmtrace_set_pt_option = vmx_set_pt_option,
     .vmtrace_get_pt_offset = vmx_get_pt_offset,
+    .vmtrace_reset_pt = vmx_reset_pt,
     .tsc_scaling = {
         .max_ratio = VMX_TSC_MULTIPLIER_MAX,
     },
