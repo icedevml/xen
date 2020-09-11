@@ -1146,10 +1146,33 @@ struct xen_domctl_vmtrace_op {
 #define XEN_DOMCTL_vmtrace_pt_enable      1
 #define XEN_DOMCTL_vmtrace_pt_disable     2
 #define XEN_DOMCTL_vmtrace_pt_get_offset  3
+#define XEN_DOMCTL_vmtrace_pt_set_option  4
     domid_t domain;
     uint16_t pad1;
     uint32_t vcpu;
     uint16_t pad2;
+/* value range: 0 (disable) or 1 (enable) */
+#define XEN_DOMCTL_VMTRACE_PT_CYC_EN         1
+#define XEN_DOMCTL_VMTRACE_PT_OS_EN          2
+#define XEN_DOMCTL_VMTRACE_PT_USER_EN        3
+#define XEN_DOMCTL_VMTRACE_PT_PWR_EVENT_EN   4
+#define XEN_DOMCTL_VMTRACE_PT_FUP_ON_PTW     5
+#define XEN_DOMCTL_VMTRACE_PT_CR3_FILTER     7
+#define XEN_DOMCTL_VMTRACE_PT_MTC_EN         9
+#define XEN_DOMCTL_VMTRACE_PT_TSC_EN         10
+#define XEN_DOMCTL_VMTRACE_PT_DIS_RETC       11
+#define XEN_DOMCTL_VMTRACE_PT_PTW_EN         12
+#define XEN_DOMCTL_VMTRACE_PT_BRANCH_EN      13
+/* value range: processor-specific, see SDM */
+#define XEN_DOMCTL_VMTRACE_PT_MTC_FREQ       14
+#define XEN_DOMCTL_VMTRACE_PT_CYC_THRESHOLD  19
+#define XEN_DOMCTL_VMTRACE_PT_PSB_FREQ       24
+/* value range: 0-2, see SDM */
+#define XEN_DOMCTL_VMTRACE_PT_ADDR0_CFG      32
+#define XEN_DOMCTL_VMTRACE_PT_ADDR1_CFG      36
+#define XEN_DOMCTL_VMTRACE_PT_ADDR2_CFG      40
+    uint32_t key;
+    uint32_t value;
 
     /* OUT variable */
     uint64_aligned_t size;

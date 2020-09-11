@@ -351,14 +351,16 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
         rc = vmtrace_control_pt(v, op->cmd == XEN_DOMCTL_vmtrace_pt_enable);
         vcpu_unpause(v);
         break;
-
     case XEN_DOMCTL_vmtrace_pt_get_offset:
         rc = vmtrace_get_pt_offset(v, &op->offset, &op->size);
-
         if ( !rc && d->is_dying )
             rc = ENODATA;
         break;
-
+    case XEN_DOMCTL_vmtrace_pt_set_option:
+        vcpu_pause(v);
+        rc = vmtrace_set_pt_option(v, op->key, op->value);
+        vcpu_unpause(v);
+        break;
     default:
         rc = -EOPNOTSUPP;
     }
