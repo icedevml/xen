@@ -1091,8 +1091,7 @@ static int _acquire_resource(
         return gnttab_acquire_resource(d, id, frame, nr_frames, mfn_list);
 
     case XENMEM_resource_vmtrace_buf:
-        return acquire_vmtrace_buf(d, xmar.id, xmar.frame, xmar.nr_frames,
-                                   mfn_list);
+        return acquire_vmtrace_buf(d, id, frame, nr_frames, mfn_list);
 
     default:
         return arch_acquire_resource(d, type, id, frame, nr_frames, mfn_list);
