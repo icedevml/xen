@@ -69,6 +69,24 @@ int xc_vmtrace_pt_get_offset(
     return rc;
 }
 
+int xc_vmtrace_pt_set_option(
+        xc_interface *xch, uint32_t domid, uint32_t vcpu,
+	uint32_t key, uint32_t value)
+{
+    DECLARE_DOMCTL;
+
+    domctl.cmd = XEN_DOMCTL_vmtrace_op;
+    domctl.domain = domid;
+    domctl.u.vmtrace_op.cmd = XEN_DOMCTL_vmtrace_pt_set_option;
+    domctl.u.vmtrace_op.vcpu = vcpu;
+    domctl.u.vmtrace_op.key = key;
+    domctl.u.vmtrace_op.value = value;
+    domctl.u.vmtrace_op.pad1 = 0;
+    domctl.u.vmtrace_op.pad2 = 0;
+
+    return do_domctl(xch, &domctl);
+}
+
 int xc_vmtrace_pt_disable(xc_interface *xch, uint32_t domid, uint32_t vcpu)
 {
     DECLARE_DOMCTL;

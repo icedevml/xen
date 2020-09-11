@@ -1610,6 +1610,21 @@ int xc_vmtrace_pt_disable(xc_interface *xch, uint32_t domid,
                           uint32_t vcpu);
 
 /**
+ * Set processor trace options for given vCPU in given DomU.
+ * This could be used to toggle flags like OS_EN, DIS_RETC etc.
+ * or to change the values of PSB freq, CYC threshold and other.
+ *
+ * @parm xch a handle to an open hypervisor interface
+ * @parm domid domain identifier
+ * @parm vcpu vcpu identifier
+ * @parm key key
+ * @parm value value
+ * @return 0 on success, -1 on failure
+ */
+int xc_vmtrace_pt_set_option(xc_interface *xch, uint32_t domid,
+                             uint32_t vcpu, uint32_t key, uint32_t value);
+
+/**
  * Get current offset inside the trace ringbuffer.
  * This allows to determine how much data was written into the buffer.
  * Once buffer overflows, the offset will reset to 0 and the previous
