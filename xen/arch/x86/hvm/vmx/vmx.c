@@ -449,6 +449,8 @@ static int vmx_init_pt(struct vcpu *v)
     if ( !v->arch.hvm.vmx.ipt_state )
         return -ENOMEM;
 
+    v->arch.hvm.vmx.ipt_state->ctl =
+        RTIT_CTL_TRACE_EN | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN;
     v->arch.hvm.vmx.ipt_state->output_base =
         page_to_maddr(v->vmtrace.pt_buf);
     v->arch.hvm.vmx.ipt_state->output_mask.raw = size - 1;
@@ -459,7 +461,7 @@ static int vmx_init_pt(struct vcpu *v)
         return rc;
 
     rc = vmx_add_guest_msr(v, MSR_RTIT_CTL,
-                              RTIT_CTL_TRACE_EN | RTIT_CTL_USR | RTIT_CTL_BRANCH_EN);
+        v->arch.hvm.vmx.ipt_state->ctl);
 
     if ( rc )
         return rc;
@@ -2321,12 +2323,59 @@ static bool vmx_get_pending_event(struct vcpu *v, struct x86_event *info)
     return true;
 }
 
+static int vmx_set_pt_option(struct vcpu *v, uint32_t key, uint32_t value)
+{
+    if ( !v->arch.hvm.vmx.ipt_state )
+        return -EINVAL;
+
+    switch ( key )
+    {
+    case XEN_DOMCTL_VMTRACE_PT_CYC_EN:
+    case XEN_DOMCTL_VMTRACE_PT_OS_EN:
+    case XEN_DOMCTL_VMTRACE_PT_USER_EN:
+    case XEN_DOMCTL_VMTRACE_PT_PWR_EVENT_EN:
+    case XEN_DOMCTL_VMTRACE_PT_FUP_ON_PTW:
+    case XEN_DOMCTL_VMTRACE_PT_CR3_FILTER:
+    case XEN_DOMCTL_VMTRACE_PT_TSC_EN:
+    case XEN_DOMCTL_VMTRACE_PT_DIS_RETC:
+    case XEN_DOMCTL_VMTRACE_PT_PTW_EN:
+    case XEN_DOMCTL_VMTRACE_PT_BRANCH_EN:
+	if (!value)
+            v->arch.hvm.vmx.ipt_state->ctl &= ~(1 << key);
+	else if (value == 1)
+            v->arch.hvm.vmx.ipt_state->ctl |= (1 << key);
+	else
+            return -EINVAL;
+        break;
+    case XEN_DOMCTL_VMTRACE_PT_MTC_FREQ:
+    case XEN_DOMCTL_VMTRACE_PT_CYC_THRESHOLD:
+    case XEN_DOMCTL_VMTRACE_PT_PSB_FREQ:
+    case XEN_DOMCTL_VMTRACE_PT_ADDR0_CFG:
+    case XEN_DOMCTL_VMTRACE_PT_ADDR1_CFG:
+    case XEN_DOMCTL_VMTRACE_PT_ADDR2_CFG:
+        v->arch.hvm.vmx.ipt_state->ctl &= (0xFFFFFFFF << key);
+        v->arch.hvm.vmx.ipt_state->ctl |= (value << key);
+	break;
+    default:
+	return -EINVAL;
+    }
+
+    return vmx_add_guest_msr(v, MSR_RTIT_CTL, v->arch.hvm.vmx.ipt_state->ctl);
+}
+
 static int vmx_control_pt(struct vcpu *v, bool enable)
 {
     if ( !v->arch.hvm.vmx.ipt_state )
         return -EINVAL;
 
     v->arch.hvm.vmx.ipt_state->active = enable;
+
+    if (enable)
+    {
+        v->arch.hvm.vmx.ipt_state->status = 0;
+        v->arch.hvm.vmx.ipt_state->output_mask.offset = 0;
+    }
+
     return 0;
 }
 
@@ -2396,6 +2445,7 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .altp2m_vcpu_emulate_ve = vmx_vcpu_emulate_ve,
     .altp2m_vcpu_emulate_vmfunc = vmx_vcpu_emulate_vmfunc,
     .vmtrace_control_pt = vmx_control_pt,
+    .vmtrace_set_pt_option = vmx_set_pt_option,
     .vmtrace_get_pt_offset = vmx_get_pt_offset,
     .tsc_scaling = {
         .max_ratio = VMX_TSC_MULTIPLIER_MAX,

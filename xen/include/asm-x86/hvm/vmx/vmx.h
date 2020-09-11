@@ -692,6 +692,7 @@ typedef union ldt_or_tr_instr_info {
 /* Processor Trace state per vCPU */
 struct ipt_state {
     bool active;
+    uint64_t ctl;
     uint64_t status;
     uint64_t output_base;
     union {
