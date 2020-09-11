@@ -218,6 +218,7 @@ struct hvm_function_table {
     int (*vmtrace_control_pt)(struct vcpu *v, bool enable);
     int (*vmtrace_set_pt_option)(struct vcpu *v, uint32_t key, uint32_t value);
     int (*vmtrace_get_pt_offset)(struct vcpu *v, uint64_t *offset, uint64_t *size);
+    int (*vmtrace_reset_pt)(struct vcpu *v);
 
     /*
      * Parameters and callbacks for hardware-assisted TSC scaling,
@@ -680,6 +681,14 @@ static inline int vmtrace_get_pt_offset(struct vcpu *v, uint64_t *offset, uint64
 {
     if ( hvm_funcs.vmtrace_get_pt_offset )
         return hvm_funcs.vmtrace_get_pt_offset(v, offset, size);
+
+    return -EOPNOTSUPP;
+}
+
+static inline int vmtrace_reset_pt(struct vcpu *v)
+{
+    if ( hvm_funcs.vmtrace_reset_pt )
+        return hvm_funcs.vmtrace_reset_pt(v);
 
     return -EOPNOTSUPP;
 }
