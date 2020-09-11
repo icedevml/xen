@@ -78,6 +78,15 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    /* All constants usable with pt_set_option
+     * are listed in xen/include/public/domctl.h */
+    rc = xc_vmtrace_pt_set_option(xc, domid, vcpu_id, XEN_DOMCTL_VMTRACE_PT_OS_EN, 1);
+
+    if (rc) {
+        fprintf(stderr, "Failed to set vmtrace PT option\n");
+        return 1;
+    }
+
     rc = xc_vmtrace_pt_enable(xc, domid, vcpu_id);
 
     if (rc) {
