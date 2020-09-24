@@ -1053,29 +1053,9 @@ static int acquire_vmtrace_buf(struct domain *d, unsigned int id,
     for ( i = 0; i < nr_frames; i++ )
         mfn_list[i] = mfn_x(mfn_add(mfn, frame + i));
 
-    return 0;
+    return nr_frames;
 }
 
-static int _acquire_2(unsigned int id, unsigned long frame,
-                      unsigned int nr_frames, xen_pfn_t mfn_list[])
-{
-    unsigned int i;
-
-    for ( i = 0; i < nr_frames; ++i )
-    {
-        mfn_list[i] = 0xdead0000 + frame + i;
-
-        /* Simulate some -ERESTARTs */
-        if ( i && ((frame + i) == 22 ||
-                   (frame + i) == 37 ||
-                   (frame + i) == 1040) )
-            break;
-    }
-
-    return i;
-}
-
->>>>>>> 666eb1e23e... x86/mm: add vmtrace_buf resource type
 /*
  * Returns -errno on error, or positive in the range [1, nr_frames] on
  * success.  Returning less than nr_frames contitutes a request for a
