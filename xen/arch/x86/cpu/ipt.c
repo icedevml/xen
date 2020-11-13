@@ -21,6 +21,7 @@
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/string.h>
+#include <xen/param.h>
 #include <asm/hvm/vmx/vmx.h>
 #include <asm/ipt.h>
 #include <asm/msr.h>
