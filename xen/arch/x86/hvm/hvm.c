@@ -3596,6 +3596,9 @@ int hvm_msr_write_intercept(unsigned int msr, uint64_t msr_content,
     HVMTRACE_3D(MSR_WRITE, msr,
                (uint32_t)msr_content, (uint32_t)(msr_content >> 32));
 
+    if (msr == MSR_IA32_RTIT_CTL)
+        printk("hvm_msr_write_intercept(%lx, %lx)\n", (unsigned long) msr, (unsigned long) msr_content);
+
     if ( may_defer && unlikely(monitored_msr(v->domain, msr)) )
     {
         uint64_t msr_old_content;

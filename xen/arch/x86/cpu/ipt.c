@@ -26,6 +26,8 @@
 #include <asm/ipt.h>
 #include <asm/msr.h>
 
+#include "../mm/mm-locks.h"
+
 #define EAX 0
 #define ECX 1
 #define EDX 2
@@ -113,119 +115,13 @@ static int __init parse_ipt_params(const char *str)
     return 0;
 }
 
-static int rtit_ctl_check(uint64_t new, uint64_t old)
-{
-    const struct cpuid_policy *p = current->domain->arch.cpuid;
-    const struct ipt_desc *ipt_desc = current->arch.hvm.vmx.ipt_desc;
-    uint64_t rtit_ctl_mask = ~((uint64_t)0);
-    unsigned int addr_range = ipt_cap(p->ipt.raw, IPT_CAP_addr_range);
-    unsigned int val, i;
-
-    if  ( new == old )
-        return 0;
-
-    /* Clear no dependency bits */
-    rtit_ctl_mask = ~(RTIT_CTL_TRACEEN | RTIT_CTL_OS |
-                RTIT_CTL_USR | RTIT_CTL_TSC_EN | RTIT_CTL_DIS_RETC);
-
-    /* If CPUID.(EAX=14H,ECX=0):EBX[0]=1 CR3Filter can be set */
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_cr3_filter) )
-        rtit_ctl_mask &= ~RTIT_CTL_CR3_FILTER;
-
-    /*
-     * If CPUID.(EAX=14H,ECX=0):EBX[1]=1 CYCEn, CycThresh and
-     * PSBFreq can be set
-     */
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_psb_cyc) )
-        rtit_ctl_mask &= ~(RTIT_CTL_CYCEN |
-                RTIT_CTL_CYC_THRESH | RTIT_CTL_PSB_FREQ);
-    /*
-     * If CPUID.(EAX=14H,ECX=0):EBX[3]=1 MTCEn BranchEn and
-     * MTCFreq can be set
-     */
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_mtc) )
-        rtit_ctl_mask &= ~(RTIT_CTL_MTC_EN |
-                RTIT_CTL_BRANCH_EN | RTIT_CTL_MTC_FREQ);
-
-    /* If CPUID.(EAX=14H,ECX=0):EBX[4]=1 FUPonPTW and PTWEn can be set */
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_ptwrite) )
-        rtit_ctl_mask &= ~(RTIT_CTL_FUP_ON_PTW |
-                                        RTIT_CTL_PTW_EN);
-
-    /* If CPUID.(EAX=14H,ECX=0):EBX[5]=1 PwrEvEn can be set */
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_power_event) )
-        rtit_ctl_mask &= ~RTIT_CTL_PWR_EVT_EN;
-
-    /* If CPUID.(EAX=14H,ECX=0):ECX[0]=1 ToPA can be set */
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_topa_output) )
-        rtit_ctl_mask &= ~RTIT_CTL_TOPA;
-    /* If CPUID.(EAX=14H,ECX=0):ECX[3]=1 FabircEn can be set */
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_output_subsys))
-        rtit_ctl_mask &= ~RTIT_CTL_FABRIC_EN;
-    /* unmask address range configure area */
-    for (i = 0; i < addr_range; i++)
-        rtit_ctl_mask &= ~(0xf << (32 + i * 4));
-
-    /*
-     * Any MSR write that attempts to change bits marked reserved will
-     * case a #GP fault.
-     */
-    if ( new & rtit_ctl_mask )
-        return 1;
-
-    /*
-     * Any attempt to modify IA32_RTIT_CTL while TraceEn is set will
-     * result in a #GP unless the same write also clears TraceEn.
-     */
-    if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) &&
-        ((ipt_desc->ipt_guest.ctl ^ new) & ~RTIT_CTL_TRACEEN) )
-        return 1;
-
-    /*
-     * WRMSR to IA32_RTIT_CTL that sets TraceEn but clears this bit
-     * and FabricEn would cause #GP, if
-     * CPUID.(EAX=14H, ECX=0):ECX.SNGLRGNOUT[bit 2] = 0
-     */
-   if ( (new & RTIT_CTL_TRACEEN) && !(new & RTIT_CTL_TOPA) &&
-        !(new & RTIT_CTL_FABRIC_EN) &&
-        !ipt_cap(p->ipt.raw, IPT_CAP_single_range_output) )
-        return 1;
-    /*
-     * MTCFreq, CycThresh and PSBFreq encodings check, any MSR write that
-     * utilize encodings marked reserved will casue a #GP fault.
-     */
-    val = ipt_cap(p->ipt.raw, IPT_CAP_mtc_period);
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_mtc) &&
-                !test_bit((new & RTIT_CTL_MTC_FREQ) >>
-                RTIT_CTL_MTC_FREQ_OFFSET, &val) )
-        return 1;
-    val = ipt_cap(p->ipt.raw, IPT_CAP_cycle_threshold);
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_psb_cyc) &&
-                !test_bit((new & RTIT_CTL_CYC_THRESH) >>
-                RTIT_CTL_CYC_THRESH_OFFSET, &val) )
-        return 1;
-    val = ipt_cap(p->ipt.raw, IPT_CAP_psb_freq);
-    if ( ipt_cap(p->ipt.raw, IPT_CAP_psb_cyc) &&
-                !test_bit((new & RTIT_CTL_PSB_FREQ) >>
-                RTIT_CTL_PSB_FREQ_OFFSET, &val) )
-        return 1;
-
-    /*
-     * If ADDRx_CFG is reserved or the encodings is >2 will
-     * cause a #GP fault.
-     */
-    for (i = 0; i < addr_range; i++)
-        if ( ((new & RTIT_CTL_ADDR(i)) >> RTIT_CTL_ADDR_OFFSET(i)) > 2 )
-            return 1;
-
-    return 0;
-}
-
 int ipt_do_rdmsr(unsigned int msr, uint64_t *msr_content)
 {
     const struct ipt_desc *ipt_desc = current->arch.hvm.vmx.ipt_desc;
     const struct cpuid_policy *p = current->domain->arch.cpuid;
     unsigned int index;
+
+    printk("ipt_do_rdmsr(%lx) => %lx\n", (unsigned long) msr, (unsigned long) *msr_content);
 
     if ( !ipt_desc )
         return 1;
@@ -239,21 +135,13 @@ int ipt_do_rdmsr(unsigned int msr, uint64_t *msr_content)
         *msr_content = ipt_desc->ipt_guest.status;
         break;
     case MSR_IA32_RTIT_OUTPUT_BASE:
-        if ( !ipt_cap(p->ipt.raw, IPT_CAP_single_range_output) &&
-             !ipt_cap(p->ipt.raw, IPT_CAP_topa_output) )
-            return 1;
         *msr_content = ipt_desc->ipt_guest.output_base;
         break;
     case MSR_IA32_RTIT_OUTPUT_MASK:
-        if ( !ipt_cap(p->ipt.raw, IPT_CAP_single_range_output) &&
-             !ipt_cap(p->ipt.raw, IPT_CAP_topa_output) )
-            return 1;
         *msr_content = ipt_desc->ipt_guest.output_mask |
                                     RTIT_OUTPUT_MASK_DEFAULT;
         break;
     case MSR_IA32_RTIT_CR3_MATCH:
-        if ( !ipt_cap(p->ipt.raw, IPT_CAP_cr3_filter) )
-            return 1;
         *msr_content = ipt_desc->ipt_guest.cr3_match;
         break;
     default:
@@ -263,6 +151,7 @@ int ipt_do_rdmsr(unsigned int msr, uint64_t *msr_content)
         *msr_content = ipt_desc->ipt_guest.addr[index];
     }
 
+    printk("ipt_do_rdmsr(%lx) => %lx\n", (unsigned long) msr, (unsigned long) *msr_content);
     return 0;
 }
 
@@ -271,6 +160,16 @@ int ipt_do_wrmsr(unsigned int msr, uint64_t msr_content)
     struct ipt_desc *ipt_desc = current->arch.hvm.vmx.ipt_desc;
     const struct cpuid_policy *p = current->domain->arch.cpuid;
     unsigned int index;
+        // int rc = -EINVAL;
+        gfn_t gfn;
+        mfn_t actual_mfn;
+        p2m_access_t a;
+        p2m_type_t t;
+        unsigned int cur_order = 0;
+
+        struct p2m_domain *p2m;
+
+    printk("ipt_do_wrmsr(%lx, %lx)\n", (unsigned long) msr, (unsigned long) msr_content);
 
     if ( !ipt_desc )
         return 1;
@@ -278,38 +177,48 @@ int ipt_do_wrmsr(unsigned int msr, uint64_t msr_content)
     switch ( msr )
     {
     case MSR_IA32_RTIT_CTL:
-        if ( rtit_ctl_check(msr_content, ipt_desc->ipt_guest.ctl) )
-            return 1;
+        // if ( rtit_ctl_check(msr_content, ipt_desc->ipt_guest.ctl) )
+        //     return 1;
         ipt_desc->ipt_guest.ctl = msr_content;
-        __vmwrite(GUEST_IA32_RTIT_CTL, msr_content);
+        // FIXME __vmwrite(GUEST_IA32_RTIT_CTL, msr_content);
         break;
     case MSR_IA32_RTIT_STATUS:
-        if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
-             (msr_content & MSR_IA32_RTIT_STATUS_MASK) )
-            return 1;
+        // if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
+        //      (msr_content & MSR_IA32_RTIT_STATUS_MASK) )
+        //     return 1;
         ipt_desc->ipt_guest.status = msr_content;
         break;
     case MSR_IA32_RTIT_OUTPUT_BASE:
-        if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
+	p2m = p2m_get_hostp2m(current->domain);
+	gfn = _gfn(msr_content >> PAGE_SHIFT);
+
+	p2m_lock(p2m);
+        actual_mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, &cur_order, NULL);
+        p2m_unlock(p2m);
+
+	printk("actual_mfn: %llx\n", (unsigned long long) mfn_x(actual_mfn));
+
+        /* if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
              (msr_content &
                  MSR_IA32_RTIT_OUTPUT_BASE_MASK(p->extd.maxphysaddr)) ||
              (!ipt_cap(p->ipt.raw, IPT_CAP_single_range_output) &&
               !ipt_cap(p->ipt.raw, IPT_CAP_topa_output)) )
-            return 1;
-        ipt_desc->ipt_guest.output_base = msr_content;
+            return 1; */
+
+        ipt_desc->ipt_guest.output_base = mfn_x(actual_mfn) << PAGE_SHIFT;
         break;
     case MSR_IA32_RTIT_OUTPUT_MASK:
-        if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
+        /* if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
              (!ipt_cap(p->ipt.raw, IPT_CAP_single_range_output) &&
               !ipt_cap(p->ipt.raw, IPT_CAP_topa_output)) )
-            return 1;
+            return 1; */
         ipt_desc->ipt_guest.output_mask = msr_content |
                                 RTIT_OUTPUT_MASK_DEFAULT;
         break;
     case MSR_IA32_RTIT_CR3_MATCH:
-        if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
+        /* if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
              !ipt_cap(p->ipt.raw, IPT_CAP_cr3_filter) )
-            return 1;
+            return 1; */
         ipt_desc->ipt_guest.cr3_match = msr_content;
         break;
     default:
@@ -327,6 +236,8 @@ static inline void ipt_load_msr(const struct ipt_ctx *ctx,
 {
     unsigned int i;
 
+//    printk("ipt_load_msr\n");
+
     wrmsrl(MSR_IA32_RTIT_STATUS, ctx->status);
     wrmsrl(MSR_IA32_RTIT_OUTPUT_BASE, ctx->output_base);
     wrmsrl(MSR_IA32_RTIT_OUTPUT_MASK, ctx->output_mask);
@@ -336,11 +247,16 @@ static inline void ipt_load_msr(const struct ipt_ctx *ctx,
         wrmsrl(MSR_IA32_RTIT_ADDR_A(i), ctx->addr[i * 2]);
         wrmsrl(MSR_IA32_RTIT_ADDR_B(i), ctx->addr[i * 2 + 1]);
     }
+
+    wrmsrl(MSR_IA32_RTIT_CTL, ctx->ctl);
 }
 
 static inline void ipt_save_msr(struct ipt_ctx *ctx, unsigned int addr_range)
 {
     unsigned int i;
+
+//    printk("ipt_save_msr\n");
+    wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
     rdmsrl(MSR_IA32_RTIT_STATUS, ctx->status);
     rdmsrl(MSR_IA32_RTIT_OUTPUT_BASE, ctx->output_base);
@@ -367,12 +283,16 @@ void ipt_guest_enter(struct vcpu *v)
      * struct ipt_desc to record the last pcpu, and check
      * if this vcpu is scheduled to another pcpu here (like vpmu).
      */
-    vmx_vmcs_enter(v);
-    __vmwrite(GUEST_IA32_RTIT_CTL, ipt->ipt_guest.ctl);
-    vmx_vmcs_exit(v);
+//    vmx_vmcs_enter(v);
+//    __vmwrite(GUEST_IA32_RTIT_CTL, ipt->ipt_guest.ctl);
+//    vmx_vmcs_exit(v);
+    // FIXME ipt
 
-    if ( ipt->ipt_guest.ctl & RTIT_CTL_TRACEEN )
-        ipt_load_msr(&ipt->ipt_guest, ipt->addr_range);
+//    if ( ipt->ipt_guest.ctl & RTIT_CTL_TRACEEN )
+//    {
+//        printk("trace en enter\n");
+//    }
+    ipt_load_msr(&ipt->ipt_guest, ipt->addr_range);
 }
 
 void ipt_guest_exit(struct vcpu *v)
@@ -382,8 +302,9 @@ void ipt_guest_exit(struct vcpu *v)
     if ( !ipt )
         return;
 
-    if ( ipt->ipt_guest.ctl & RTIT_CTL_TRACEEN )
-        ipt_save_msr(&ipt->ipt_guest, ipt->addr_range);
+//    if ( ipt->ipt_guest.ctl & RTIT_CTL_TRACEEN )
+//	    printk("trace en exit\n");
+    ipt_save_msr(&ipt->ipt_guest, ipt->addr_range);
 }
 
 int ipt_initialize(struct vcpu *v)
@@ -391,12 +312,18 @@ int ipt_initialize(struct vcpu *v)
     struct ipt_desc *ipt = NULL;
     unsigned int eax, tmp, addr_range;
 
-    if ( !cpu_has_ipt || (ipt_mode == IPT_MODE_OFF) ||
-         !(v->arch.hvm.vmx.secondary_exec_control & SECONDARY_EXEC_PT_USE_GPA) )
+    printk("entered ipt_initialize %d %d %d\n", cpu_has_ipt, ipt_mode != IPT_MODE_OFF, !!(v->arch.hvm.vmx.secondary_exec_control & SECONDARY_EXEC_PT_USE_GPA));
+
+    if ( !cpu_has_ipt || (ipt_mode == IPT_MODE_OFF) )
+//         !(v->arch.hvm.vmx.secondary_exec_control & SECONDARY_EXEC_PT_USE_GPA) )
         return 0;
+
+    printk("mode ok\n");
 
     if ( cpuid_eax(IPT_CPUID) == 0 )
         return -EINVAL;
+
+    printk("cpuid ok\n");
 
     cpuid_count(IPT_CPUID, 1, &eax, &tmp, &tmp, &tmp);
     addr_range = eax & IPT_ADDR_RANGE_MASK;
@@ -409,6 +336,7 @@ int ipt_initialize(struct vcpu *v)
     ipt->ipt_guest.output_mask = RTIT_OUTPUT_MASK_DEFAULT;
     v->arch.hvm.vmx.ipt_desc = ipt;
 
+    printk("done\n");
     return 0;
 }
 

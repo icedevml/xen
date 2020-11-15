@@ -309,9 +309,9 @@ static int vmx_init_vmcs_config(void)
         rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
         if ( _vmx_misc_cap & VMX_MISC_VMWRITE_ALL )
             opt |= SECONDARY_EXEC_ENABLE_VMCS_SHADOWING;
-        if ( _vmx_misc_cap & VMX_MISC_PT_ENABLE )
-            opt |= SECONDARY_EXEC_PT_USE_GPA |
-                   SECONDARY_EXEC_CONCEAL_PT_PIP;
+        //if ( _vmx_misc_cap & VMX_MISC_PT_ENABLE )
+            //opt |= SECONDARY_EXEC_PT_USE_GPA |
+            //       SECONDARY_EXEC_CONCEAL_PT_PIP;
         if ( opt_vpid_enabled )
             opt |= SECONDARY_EXEC_ENABLE_VPID;
         if ( opt_unrestricted_guest_enabled )
@@ -460,10 +460,11 @@ static int vmx_init_vmcs_config(void)
     if ( mismatch )
         return -EINVAL;
 
+//    printk("detected ipt: %d %d %d %d\n");
     if ( !(_vmx_secondary_exec_control & SECONDARY_EXEC_ENABLE_EPT) ||
-         !(_vmx_secondary_exec_control & SECONDARY_EXEC_PT_USE_GPA) ||
-         !(_vmx_vmexit_control & VM_EXIT_CLEAR_IA32_RTIT_CTL) ||
-         !(_vmx_vmentry_control & VM_ENTRY_LOAD_IA32_RTIT_CTL) ||
+//         !(_vmx_secondary_exec_control & SECONDARY_EXEC_PT_USE_GPA) ||
+//         !(_vmx_vmexit_control & VM_EXIT_CLEAR_IA32_RTIT_CTL) ||
+//         !(_vmx_vmentry_control & VM_ENTRY_LOAD_IA32_RTIT_CTL) ||
          (ipt_mode == IPT_MODE_OFF) )
     {
         _vmx_secondary_exec_control &= ~(SECONDARY_EXEC_PT_USE_GPA |

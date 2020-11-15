@@ -496,6 +496,8 @@ static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
         .error_code = errcode,
     };
 
+    printk("inject_hw_exception %u %d\n", vector, errcode);
+
     hvm_inject_event(&event);
 }
 

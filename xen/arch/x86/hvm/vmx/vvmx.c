@@ -1099,15 +1099,21 @@ static void load_shadow_guest_state(struct vcpu *v)
 
     rc = hvm_set_cr4(get_vvmcs(v, GUEST_CR4), true);
     if ( rc == X86EMUL_EXCEPTION )
+    {
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    }
 
     rc = hvm_set_cr0(get_vvmcs(v, GUEST_CR0), true);
     if ( rc == X86EMUL_EXCEPTION )
+    {
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    }
 
     rc = hvm_set_cr3(get_vvmcs(v, GUEST_CR3), false, true);
     if ( rc == X86EMUL_EXCEPTION )
+    {
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    }
 
     control = get_vvmcs(v, VM_ENTRY_CONTROLS);
     if ( control & VM_ENTRY_LOAD_GUEST_PAT )
@@ -1117,7 +1123,9 @@ static void load_shadow_guest_state(struct vcpu *v)
         rc = hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
                                      get_vvmcs(v, GUEST_PERF_GLOBAL_CTRL), false);
         if ( rc == X86EMUL_EXCEPTION )
+	{
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
+	}
     }
 
     hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
@@ -1143,6 +1151,34 @@ static void load_shadow_guest_state(struct vcpu *v)
     __vmwrite(CR4_GUEST_HOST_MASK, v->arch.hvm.vmx.cr4_host_mask);
 
     /* TODO: CR3 target control */
+
+    {
+    u64 exit_load_count = get_vvmcs(v, VM_EXIT_MSR_LOAD_COUNT);
+    u64 exit_load_addr = get_vvmcs(v, VM_EXIT_MSR_LOAD_ADDR);
+    u64 exit_store_count = get_vvmcs(v, VM_EXIT_MSR_STORE_COUNT);
+    u64 exit_store_addr = get_vvmcs(v, VM_EXIT_MSR_STORE_ADDR);
+    u64 entry_load_count = get_vvmcs(v, VM_ENTRY_MSR_LOAD_COUNT);
+    u64 entry_load_addr = get_vvmcs(v, VM_ENTRY_MSR_LOAD_ADDR);
+
+    p2m_type_t p2mt;
+
+    struct page_info *exit_load_pg;
+    struct page_info *exit_store_pg;
+    struct page_info *entry_load_pg;
+
+    exit_load_pg = get_page_from_gfn(v->domain, exit_load_addr >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
+    exit_store_pg = get_page_from_gfn(v->domain, exit_store_addr >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
+    entry_load_pg = get_page_from_gfn(v->domain, entry_load_addr >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
+
+    __vmwrite(VM_EXIT_MSR_LOAD_COUNT, exit_load_count);
+    __vmwrite(VM_EXIT_MSR_LOAD_ADDR, page_to_maddr(exit_load_pg) + (exit_load_addr & 0xFFF));
+
+    __vmwrite(VM_EXIT_MSR_STORE_COUNT, exit_store_count);
+    __vmwrite(VM_EXIT_MSR_STORE_ADDR, page_to_maddr(exit_store_pg) + (exit_store_addr & 0xFFF));
+
+    __vmwrite(VM_ENTRY_MSR_LOAD_COUNT, entry_load_count);
+    __vmwrite(VM_ENTRY_MSR_LOAD_ADDR, page_to_maddr(entry_load_pg) + (entry_load_addr & 0xFFF));
+    }
 }
 
 static uint64_t get_shadow_eptp(struct vcpu *v)
@@ -1242,6 +1278,9 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     regs->rsp = get_vvmcs(v, GUEST_RSP);
     regs->rflags = get_vvmcs(v, GUEST_RFLAGS);
 
+    printk("VM_ENTRY_MSR_LOAD_COUNT: %lx\n", (unsigned long) get_vvmcs(v, VM_ENTRY_MSR_LOAD_COUNT));
+    printk("VM_EXIT_MSR_LOAD_COUNT: %lx\n", (unsigned long) get_vvmcs(v, VM_EXIT_MSR_LOAD_COUNT));
+
     /* updating host cr0 to sync TS bit */
     __vmwrite(HOST_CR0, v->arch.hvm.vmx.host_cr0);
 
@@ -1313,15 +1352,21 @@ static void load_vvmcs_host_state(struct vcpu *v)
 
     rc = hvm_set_cr4(get_vvmcs(v, HOST_CR4), true);
     if ( rc == X86EMUL_EXCEPTION )
+    {
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    }
 
     rc = hvm_set_cr0(get_vvmcs(v, HOST_CR0), true);
     if ( rc == X86EMUL_EXCEPTION )
+    {
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    }
 
     rc = hvm_set_cr3(get_vvmcs(v, HOST_CR3), false, true);
     if ( rc == X86EMUL_EXCEPTION )
+    {
         hvm_inject_hw_exception(TRAP_gp_fault, 0);
+    }
 
     control = get_vvmcs(v, VM_EXIT_CONTROLS);
     if ( control & VM_EXIT_LOAD_HOST_PAT )
@@ -1331,7 +1376,9 @@ static void load_vvmcs_host_state(struct vcpu *v)
         rc = hvm_msr_write_intercept(MSR_CORE_PERF_GLOBAL_CTRL,
                                      get_vvmcs(v, HOST_PERF_GLOBAL_CTRL), true);
         if ( rc == X86EMUL_EXCEPTION )
+	{
             hvm_inject_hw_exception(TRAP_gp_fault, 0);
+	}
     }
 
     hvm_set_tsc_offset(v, v->arch.hvm.cache_tsc_offset, 0);
@@ -1548,6 +1595,8 @@ static int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     uint32_t nvmcs_revid;
     int rc;
 
+    printk("l2 vmxon\n");
+
     rc = decode_vmx_inst(regs, &decode, &gpa);
     if ( rc != X86EMUL_OKAY )
         return rc;
@@ -1589,10 +1638,10 @@ static int nvmx_handle_vmxon(struct cpu_user_regs *regs)
 
     if ( v->arch.hvm.vmx.ipt_desc )
     {
-        v->arch.hvm.vmx.ipt_desc->ipt_guest.ctl = 0;
-        vmx_vmcs_enter(current);
-        __vmwrite(GUEST_IA32_RTIT_CTL, 0);
-        vmx_vmcs_exit(current);
+//        v->arch.hvm.vmx.ipt_desc->ipt_guest.ctl = 0;
+//        vmx_vmcs_enter(current);
+        // FIXME __vmwrite(GUEST_IA32_RTIT_CTL, 0);
+//        vmx_vmcs_exit(current);
     }
 
     return X86EMUL_OKAY;
@@ -2181,6 +2230,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
     u64 data = 0, host_data = 0;
     int r = 1;
 
+    printk("nvmx msr read\n");
+
     /* VMX capablity MSRs are available only when guest supports VMX. */
     if ( !nestedhvm_enabled(d) || !d->arch.cpuid->basic.vmx )
         return 0;
@@ -2335,8 +2386,8 @@ int nvmx_msr_read_intercept(unsigned int msr, u64 *msr_content)
         data = hvm_cr4_guest_valid_bits(d, false);
         break;
     case MSR_IA32_VMX_MISC:
-        /* Do not support CR3-target and PT VMX feature now */
-        data = host_data & ~(VMX_MISC_CR3_TARGET | VMX_MISC_PT_ENABLE);
+        /* Do not support CR3-target feature now */
+        data = host_data & ~(VMX_MISC_CR3_TARGET);
         break;
     case MSR_IA32_VMX_EPT_VPID_CAP:
         data = nept_get_ept_vpid_cap();
