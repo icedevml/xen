@@ -160,14 +160,6 @@ int ipt_do_wrmsr(unsigned int msr, uint64_t msr_content)
     struct ipt_desc *ipt_desc = current->arch.hvm.vmx.ipt_desc;
     const struct cpuid_policy *p = current->domain->arch.cpuid;
     unsigned int index;
-        // int rc = -EINVAL;
-        gfn_t gfn;
-        mfn_t actual_mfn;
-        p2m_access_t a;
-        p2m_type_t t;
-        unsigned int cur_order = 0;
-
-        struct p2m_domain *p2m;
 
     printk("ipt_do_wrmsr(%lx, %lx)\n", (unsigned long) msr, (unsigned long) msr_content);
 
@@ -189,24 +181,16 @@ int ipt_do_wrmsr(unsigned int msr, uint64_t msr_content)
         ipt_desc->ipt_guest.status = msr_content;
         break;
     case MSR_IA32_RTIT_OUTPUT_BASE:
-	p2m = p2m_get_hostp2m(current->domain);
-	gfn = _gfn(msr_content >> PAGE_SHIFT);
+    {
+        p2m_type_t p2mt;
+	struct page_info *output_base_pg = get_page_from_gfn(
+            current->domain, msr_content >> PAGE_SHIFT, &p2mt, 0);
+	u64 actual_maddr = page_to_maddr(output_base_pg);
 
-	p2m_lock(p2m);
-        actual_mfn = p2m->get_entry(p2m, gfn, &t, &a, 0, &cur_order, NULL);
-        p2m_unlock(p2m);
-
-	printk("actual_mfn: %llx\n", (unsigned long long) mfn_x(actual_mfn));
-
-        /* if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
-             (msr_content &
-                 MSR_IA32_RTIT_OUTPUT_BASE_MASK(p->extd.maxphysaddr)) ||
-             (!ipt_cap(p->ipt.raw, IPT_CAP_single_range_output) &&
-              !ipt_cap(p->ipt.raw, IPT_CAP_topa_output)) )
-            return 1; */
-
-        ipt_desc->ipt_guest.output_base = mfn_x(actual_mfn) << PAGE_SHIFT;
+        printk("actual_maddr: %llx\n", (unsigned long long) mfn_x(actual_maddr));
+        ipt_desc->ipt_guest.output_base = actual_maddr;
         break;
+    }
     case MSR_IA32_RTIT_OUTPUT_MASK:
         /* if ( (ipt_desc->ipt_guest.ctl & RTIT_CTL_TRACEEN) ||
              (!ipt_cap(p->ipt.raw, IPT_CAP_single_range_output) &&
@@ -248,7 +232,7 @@ static inline void ipt_load_msr(const struct ipt_ctx *ctx,
         wrmsrl(MSR_IA32_RTIT_ADDR_B(i), ctx->addr[i * 2 + 1]);
     }
 
-    wrmsrl(MSR_IA32_RTIT_CTL, ctx->ctl);
+//    wrmsrl(MSR_IA32_RTIT_CTL, ctx->ctl);
 }
 
 static inline void ipt_save_msr(struct ipt_ctx *ctx, unsigned int addr_range)
@@ -256,7 +240,7 @@ static inline void ipt_save_msr(struct ipt_ctx *ctx, unsigned int addr_range)
     unsigned int i;
 
 //    printk("ipt_save_msr\n");
-    wrmsrl(MSR_IA32_RTIT_CTL, 0);
+//    wrmsrl(MSR_IA32_RTIT_CTL, 0);
 
     rdmsrl(MSR_IA32_RTIT_STATUS, ctx->status);
     rdmsrl(MSR_IA32_RTIT_OUTPUT_BASE, ctx->output_base);

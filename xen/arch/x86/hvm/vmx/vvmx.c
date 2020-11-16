@@ -1166,9 +1166,9 @@ static void load_shadow_guest_state(struct vcpu *v)
     struct page_info *exit_store_pg;
     struct page_info *entry_load_pg;
 
-    exit_load_pg = get_page_from_gfn(v->domain, exit_load_addr >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
-    exit_store_pg = get_page_from_gfn(v->domain, exit_store_addr >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
-    entry_load_pg = get_page_from_gfn(v->domain, entry_load_addr >> PAGE_SHIFT, &p2mt, P2M_ALLOC);
+    exit_load_pg = get_page_from_gfn(v->domain, exit_load_addr >> PAGE_SHIFT, &p2mt, 0);
+    exit_store_pg = get_page_from_gfn(v->domain, exit_store_addr >> PAGE_SHIFT, &p2mt, 0);
+    entry_load_pg = get_page_from_gfn(v->domain, entry_load_addr >> PAGE_SHIFT, &p2mt, 0);
 
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, exit_load_count);
     __vmwrite(VM_EXIT_MSR_LOAD_ADDR, page_to_maddr(exit_load_pg) + (exit_load_addr & 0xFFF));
