@@ -179,6 +179,7 @@ subdir-all-qemu-xen-dir: qemu-xen-dir-find
 	PKG_CONFIG_PATH=$(XEN_ROOT)/tools/pkg-config$${PKG_CONFIG_PATH:+:$${PKG_CONFIG_PATH}} \
 	$$source/configure --enable-xen --target-list=i386-softmmu \
 		$(QEMU_XEN_ENABLE_DEBUG) \
+		--with-pkgversion=qemu-xen-4.22.0-drakvuf1 \
 		$$enable_trace_backend \
 		--prefix=$(prefix) \
 		--libdir=$(LIBEXEC_LIB) \
